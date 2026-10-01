@@ -30,6 +30,19 @@ if ($secondaryRoot -eq $offsiteRoot) {
     throw "SecondaryDestination dan OffsiteDestination harus berbeda."
 }
 
+$trimChars = [char[]]@('\', '/')
+$sourceNormalized = $source.TrimEnd($trimChars)
+$sourcePrefix = $sourceNormalized + [System.IO.Path]::DirectorySeparatorChar
+foreach ($root in @($secondaryRoot, $offsiteRoot)) {
+    $rootNormalized = $root.TrimEnd($trimChars)
+    if (
+        $rootNormalized.Equals($sourceNormalized, [System.StringComparison]::OrdinalIgnoreCase) -or
+        $rootNormalized.StartsWith($sourcePrefix, [System.StringComparison]::OrdinalIgnoreCase)
+    ) {
+        throw "Destination tidak boleh sama dengan atau berada di dalam BackupDir: $root"
+    }
+}
+
 $folderName = Split-Path -Leaf $source
 $secondaryTarget = Join-Path $secondaryRoot $folderName
 $offsiteTarget = Join-Path $offsiteRoot $folderName
