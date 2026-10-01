@@ -4,9 +4,9 @@ Tanggal: 2026-10-01
 
 ## Recovery R0 status
 
-**R0 COMPLETE WITH LOCAL BACKUP PENDING**
+**R0 COMPLETE / BACKUP VERIFIED**
 
-Repository sekarang mempunyai keadaan recovery yang dapat dipercaya dengan provenance terpisah antara source asli, historical evidence, dan tooling recovery baru.
+Repository sekarang mempunyai keadaan recovery yang dapat dipercaya dengan provenance terpisah antara source asli, historical evidence, dan tooling recovery baru. Canonical backup juga telah dibuat, diverifikasi, direstore, dan disalin ke penyimpanan di luar GitHub.
 
 ## Current application baseline
 
@@ -46,10 +46,12 @@ Ia didokumentasikan sebagai high-value recovery evidence tetapi tidak dicampur k
 - manifest: 10/10 parse PASS, MV3, version 0.1.8;
 - JavaScript syntax: 40/40 PASS (`node --check`, Node v22.16.0);
 - reconstructed snapshot verifier: PASS — 182 checks, 0 failures, 40 JS checked;
-- common secret-pattern scan pada rescue source: 0 hit;
+- full Git-object common-secret scan: PASS for selected patterns/risky filenames — 285 objects, 68 blobs, 295132 bytes, 0 hits;
 - Chrome Load unpacked integration: NOT RUN;
 - ChatGPT live: NOT RUN;
 - real launcher E2E: NOT RUN.
+
+Specialized provider-aware/entropy secret scanner seperti Gitleaks/TruffleHog belum dijalankan, jadi status secret di atas harus dibaca sesuai scope scan yang dicatat.
 
 ## Build
 
@@ -57,24 +59,43 @@ Ia didokumentasikan sebagai high-value recovery evidence tetapi tidak dicampur k
 
 Old main v0.1.8 tidak memiliki package/build/test/CI framework. Extension dipasang dari folder source melalui Chrome `Load unpacked`.
 
-## Backup
+## Canonical backup
 
-- Backup policy/tooling: PRESENT.
-- Final canonical Git bundle dari final R0: NOT RUN pada environment Chat 5.
-- Restore drill final R0: NOT RUN.
-- Secondary/offsite verified copy: PENDING.
-- Status: **BACKUP_LOCAL_PENDING**.
+Checkpoint repository yang diverifikasi: `3328164272e2eda47fdcf15ee13123e525e945f1`.
 
-## Local action required
+GitHub Actions run `36833765406` menjalankan workflow canonical backup dan seluruh tahap selesai SUCCESS:
 
-Pada clone Windows authoritative dari final R0:
+- reconstructed snapshot verifier: PASS;
+- canonical `repo.bundle`: CREATED;
+- canonical `source.zip` (`git archive HEAD`): CREATED;
+- SHA-256 verification: PASS;
+- `git bundle verify`: PASS;
+- restore drill dari bundle: PASS;
+- `git fsck --full`: PASS;
+- restored HEAD matches manifest: PASS;
+- final manifest status: `VERIFIED`;
+- workflow artifact upload: PASS.
 
-1. jalankan dedicated secret/history scan bila tersedia;
-2. jalankan `tools/backup/Backup-Repository.ps1`;
-3. jalankan `Verify-Backup.ps1`;
-4. jalankan `Restore-Backup.ps1` ke folder baru;
-5. setelah VERIFIED, buat secondary + offsite copy dengan media/provider independen.
+Hashes:
+
+- `repo.bundle`: `c291eaada0b620408e810f4a43da5a5460cb79a3034a6028b56d5e9084abd057`;
+- `source.zip`: `04f629506e2d68ca011264d1b6d38e5f555982b620f268d811bc0c87ca8c258e`;
+- outer canonical artifact ZIP: `eb6ef37eb3b3f6821a06c15c42acd6a18f325e24990eb6dda9da2c8023cbe8c6`.
+
+Setelah artifact diunduh dari GitHub Actions, verifikasi independen dijalankan lagi: hash internal cocok, `git bundle verify` PASS, clone bundle PASS, `git fsck --full` PASS, dan restored HEAD tetap `3328164272e2eda47fdcf15ee13123e525e945f1`.
+
+Canonical backup ZIP kemudian disalin ke Library:
+
+`/Backups/CHATGPT-QUEUE-RUNNER/R0/CHATGPT-QUEUE-RUNNER-R0-canonical-backup-3328164.zip`
+
+Raw rescue ZIP, hash rescue, rescue manifest, dan laporan full Git-object common-secret scan juga dipertahankan pada folder Library R0.
+
+Status backup canonical: **BACKUP_VERIFIED**.
+
+## Resilience tambahan yang disarankan
+
+Untuk ketahanan 3-2-1 yang lebih kuat, user tetap disarankan mengunduh canonical backup ZIP ke PC dan menyalinnya ke HDD/SSD eksternal. Ini menambah media fisik kedua di luar SSD kerja dan di luar cloud.
 
 ## Next phase
 
-Recovery R0 berhenti di sini. Fase berikutnya, bila diminta user, adalah evaluasi terpisah terhadap old v0.2.0 hardening branch dan live Chrome/ChatGPT validation — bukan bagian R0.
+Recovery R0 + canonical backup selesai. Fase berikutnya, bila diminta user, adalah evaluasi terpisah terhadap old v0.2.0 hardening branch dan live Chrome/ChatGPT validation — bukan bagian R0.
