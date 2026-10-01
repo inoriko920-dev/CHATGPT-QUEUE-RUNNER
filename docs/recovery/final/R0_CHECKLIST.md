@@ -4,6 +4,8 @@ Tanggal verifikasi: 2026-10-01
 
 Checkpoint aplikasi R0: `1d1cd6df547673869e1a374fc5320861924689e4`
 
+Checkpoint repository yang dibackup dan direstore: `3328164272e2eda47fdcf15ee13123e525e945f1`
+
 ## Checklist
 
 | Item | Status | Bukti / catatan |
@@ -18,33 +20,37 @@ Checkpoint aplikasi R0: `1d1cd6df547673869e1a374fc5320861924689e4`
 | File rescue mentah disimpan | ✅ PASS | `extensions.zip` asli dipertahankan di luar GitHub sebagai copy independen; SHA-256 `f46767d61dff61c2b0ce7dc413fc7dbe29f78d0029c17a2259d54bd96c5ddd56`. |
 | Missing known files dicatat | ✅ PASS | Baseline old main v0.1.8 direkonsiliasi menjadi 81/81 file; known missing baseline source = 0. |
 | Planned != implemented | ✅ PASS | v0.2.0 / B01–B19 tetap historical evidence dan tidak diklaim sebagai current R0 implementation. |
-| Tidak ada secret | ⚠️ PARTIAL | Common secret-pattern scan pada rescue source menghasilkan 0 hit. Full-history scanner khusus seperti Gitleaks/TruffleHog belum dijalankan, jadi tidak diklaim sebagai full-history secret-clean. |
+| Tidak ada secret | ✅ PASS (scoped) | Full Git-object common-secret scan terhadap bundle terverifikasi memeriksa 285 object / 68 blob / 295132 byte dan menemukan 0 content-pattern hit serta 0 high-risk-path hit. Ini bukan pengganti specialized entropy/provider-aware scanner seperti Gitleaks/TruffleHog. |
 | Test status dicatat | ✅ PASS | Static/snapshot PASS; Chrome/ChatGPT live dan launcher E2E tetap NOT RUN. |
 | Build status dicatat | ✅ PASS | N/A — baseline v0.1.8 tidak mempunyai build step. |
-| R0 commit diketahui | ✅ PASS | `1d1cd6df547673869e1a374fc5320861924689e4`. |
-| Git Bundle dibuat (atau BACKUP_LOCAL_PENDING) | ⏳ BACKUP_LOCAL_PENDING | Belum dapat dibuat dari environment Chat 5 karena tidak tersedia clone Git lokal authoritative milik user. |
-| Bundle verify PASS | ⏳ PENDING | Menunggu `repo.bundle` canonical. |
-| Restore test PASS | ⏳ PENDING | Menunggu canonical bundle dan restore drill pada folder baru. |
-| Source ZIP | ⚠️ PARTIAL | Raw rescue ZIP asli tersedia dan hash cocok. Canonical `source.zip` dari `git archive HEAD` final R0 belum dibuat. |
-| SHA256 | ⚠️ PARTIAL | SHA-256 raw rescue tersedia dan cocok. `SHA256SUMS.txt` canonical backup final belum dibuat. |
-| Copy offsite | ⚠️ PARTIAL | Raw rescue source sudah mempunyai copy di luar GitHub. Canonical backup set (`repo.bundle`, `source.zip`, checksums, manifest) belum mempunyai offsite verified copy. |
+| R0 commit diketahui | ✅ PASS | Application checkpoint `1d1cd6df547673869e1a374fc5320861924689e4`. |
+| Git Bundle dibuat | ✅ PASS | Canonical `repo.bundle` dibuat untuk repository checkpoint `3328164272e2eda47fdcf15ee13123e525e945f1`; SHA-256 `c291eaada0b620408e810f4a43da5a5460cb79a3034a6028b56d5e9084abd057`. |
+| Bundle verify PASS | ✅ PASS | `git bundle verify` PASS di GitHub Actions dan diverifikasi ulang secara independen setelah artifact diunduh. Bundle mencatat complete history. |
+| Restore test PASS | ✅ PASS | Clone dari bundle PASS; `git fsck --full` PASS; restored HEAD sama dengan manifest: `3328164272e2eda47fdcf15ee13123e525e945f1`. |
+| Source ZIP | ✅ PASS | Canonical `source.zip` dibuat dengan `git archive HEAD`; SHA-256 `04f629506e2d68ca011264d1b6d38e5f555982b620f268d811bc0c87ca8c258e`. |
+| SHA256 | ✅ PASS | Hash artifact internal cocok dengan manifest dan diverifikasi ulang setelah download. Outer workflow artifact SHA-256 `eb6ef37eb3b3f6821a06c15c42acd6a18f325e24990eb6dda9da2c8023cbe8c6`. |
+| Copy offsite | ✅ PASS | Canonical backup ZIP disalin ke Library `/Backups/CHATGPT-QUEUE-RUNNER/R0/` di luar GitHub. Raw rescue + hash + scan report juga dipertahankan di lokasi tersebut. |
 | STATUS_GLOBAL diperbarui | ✅ PASS | `docs/recovery/final/STATUS_GLOBAL.md` menjadi sumber ringkas status fase. |
+
+## Backup evidence
+
+- GitHub Actions run: `36833765406` — **SUCCESS**.
+- Artifact ID: `11148193785`.
+- Artifact name: `CHATGPT-QUEUE-RUNNER-R0-canonical-backup-3328164`.
+- Artifact retention GitHub Actions: sampai 2026-10-31 (copy Library dipertahankan terpisah).
+- Manifest status setelah restore drill: `VERIFIED`.
+- `repo.bundle` SHA-256: `c291eaada0b620408e810f4a43da5a5460cb79a3034a6028b56d5e9084abd057`.
+- `source.zip` SHA-256: `04f629506e2d68ca011264d1b6d38e5f555982b620f268d811bc0c87ca8c258e`.
+- outer artifact ZIP SHA-256: `eb6ef37eb3b3f6821a06c15c42acd6a18f325e24990eb6dda9da2c8023cbe8c6`.
 
 ## Status menurut aturan checklist
 
-Karena source sudah mencapai R0 tetapi canonical backup belum dibuat + diverifikasi + restore-tested, status yang benar adalah:
+Syarat canonical backup yang sebelumnya pending sekarang telah benar-benar dijalankan dan diverifikasi. Status yang benar adalah:
 
-**`R0_READY / BACKUP_PENDING`**
+**`R0_READY / BACKUP_VERIFIED`**
 
-Jangan menaikkan status menjadi `BACKUP_VERIFIED` sebelum semua syarat berikut benar-benar PASS:
+`BACKUP_VERIFIED` berarti set backup canonical dapat diverifikasi dan direstore. Ini tidak berarti runtime Chrome/ChatGPT Web sudah diuji dan tidak berarti specialized secret scanner telah dijalankan.
 
-1. `repo.bundle` dibuat dari clone Git lokal yang benar dan bersih;
-2. `git bundle verify` PASS;
-3. restore drill ke folder baru PASS;
-4. `git fsck --full` pada hasil restore PASS;
-5. restored HEAD cocok dengan commit yang dicatat di manifest;
-6. canonical backup set disalin ke media/provider independen dan hash diverifikasi.
+## Rekomendasi resilience tambahan
 
-## Batas klaim
-
-R0 ini menjamin baseline source yang teridentifikasi dan provenance recovery yang dapat diaudit. R0 ini belum menjamin perilaku runtime pada Chrome/ChatGPT Web saat ini dan belum menjamin canonical backup 3-2-1 sampai langkah lokal selesai.
+Untuk memenuhi praktik 3-2-1 sekuat mungkin, user tetap disarankan mengunduh canonical backup ZIP ke PC lalu menyalinnya ke HDD/SSD eksternal. Copy Library sudah menyediakan copy di luar GitHub, tetapi media fisik kedua memberi perlindungan tambahan dari kegagalan akun/cloud.
