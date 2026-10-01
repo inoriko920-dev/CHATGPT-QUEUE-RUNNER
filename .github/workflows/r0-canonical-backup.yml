@@ -14,10 +14,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - name: Checkout canonical R0 documentation checkpoint
+      - name: Checkout final verified R0 main checkpoint
         uses: actions/checkout@v4
         with:
-          ref: 3328164272e2eda47fdcf15ee13123e525e945f1
+          ref: e403cafa93bb1cc9c569df4325a464c7fb7fa7da
           fetch-depth: 0
           fetch-tags: true
 
@@ -28,7 +28,7 @@ jobs:
           git fetch --prune origin '+refs/heads/*:refs/remotes/origin/*' '+refs/tags/*:refs/tags/*'
           git status --porcelain
           test -z "$(git status --porcelain)"
-          test "$(git rev-parse HEAD)" = "3328164272e2eda47fdcf15ee13123e525e945f1"
+          test "$(git rev-parse HEAD)" = "e403cafa93bb1cc9c569df4325a464c7fb7fa7da"
 
       - name: Run reconstructed R0 snapshot verifier
         shell: bash
@@ -64,17 +64,17 @@ jobs:
           $manifestPath = Join-Path $dir 'BACKUP_MANIFEST.json'
           $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
           if ($manifest.backup_status -ne 'VERIFIED') { throw "Manifest status is $($manifest.backup_status), expected VERIFIED." }
-          if ($manifest.source.head_commit -ne '3328164272e2eda47fdcf15ee13123e525e945f1') { throw 'Manifest HEAD does not match canonical checkpoint.' }
+          if ($manifest.source.head_commit -ne 'e403cafa93bb1cc9c569df4325a464c7fb7fa7da') { throw 'Manifest HEAD does not match final verified R0 checkpoint.' }
 
           $restoredHead = (git -C $restore rev-parse HEAD).Trim()
-          if ($restoredHead -ne '3328164272e2eda47fdcf15ee13123e525e945f1') { throw "Restored HEAD mismatch: $restoredHead" }
+          if ($restoredHead -ne 'e403cafa93bb1cc9c569df4325a464c7fb7fa7da') { throw "Restored HEAD mismatch: $restoredHead" }
 
           $evidence = [ordered]@{
             schema_version = '1.0'
             workflow = 'R0 Canonical Backup Verification'
             github_run_id = $env:GITHUB_RUN_ID
             github_run_attempt = $env:GITHUB_RUN_ATTEMPT
-            canonical_checkpoint = '3328164272e2eda47fdcf15ee13123e525e945f1'
+            canonical_checkpoint = 'e403cafa93bb1cc9c569df4325a464c7fb7fa7da'
             application_checkpoint = '1d1cd6df547673869e1a374fc5320861924689e4'
             backup_manifest_status = $manifest.backup_status
             sha256_status = $manifest.verification.sha256
@@ -91,7 +91,7 @@ jobs:
       - name: Upload verified canonical backup artifact
         uses: actions/upload-artifact@v4
         with:
-          name: CHATGPT-QUEUE-RUNNER-R0-canonical-backup-3328164
+          name: CHATGPT-QUEUE-RUNNER-R0-final-canonical-backup-e403caf
           path: ${{ steps.backup.outputs.backup_dir }}
           if-no-files-found: error
           retention-days: 30
