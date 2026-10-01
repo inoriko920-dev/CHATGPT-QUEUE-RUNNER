@@ -1,219 +1,214 @@
 # RECOVERY_TEST_EVIDENCE — Chat 3 / SOL-C — Recovery R0
 
-Tanggal audit: 2026-10-01
-Branch worker: `recovery/chat3-test-build-r0`
+Tanggal: 2026-10-01
+Worker branch: `recovery/chat3-test-build-r0`
 Coordinator baseline: `083ed5030d6a6304e9f720ce6edcec5b4ce83288`
+Exact source under evidence: `recovery/chat1-source-r0@4719c0e17e83bf03afd141b96156614f83b9631a`
 
-## 1. Scope dan provenance
+## 1. Scope / provenance
 
-Dokumen ini mencatat evidence test/build yang benar-benar tersedia saat Chat 3 berjalan.
+Chat 3 memisahkan empat lapisan evidence:
 
-Label provenance yang digunakan:
+1. exact rescue/source inventory;
+2. syntax/static;
+3. reconstructed mock/regression;
+4. Chrome integration / ChatGPT live.
 
-- `VERIFIED_SOURCE` — diamati langsung pada repo recovery saat ini;
-- `VERIFIED_FROM_BUILD` — hanya jika artifact build benar-benar tersedia dan diperiksa;
-- `RECONSTRUCTED_FROM_DOCS` — berasal dari dokumen/audit lama;
-- `RECONSTRUCTED_FROM_BEHAVIOR` — berasal dari observasi behavior yang dapat diverifikasi;
-- `UNKNOWN` — belum dapat dibuktikan.
+Tidak ada layer yang dipromosikan ke layer lebih tinggi. Syntax PASS bukan behavior PASS.
 
-Tidak ada claim `VERIFIED_FROM_BUILD` pada run ini karena tidak ada artifact build/source recovered yang tersedia untuk Chat 3.
-
-## 2. Current repository evidence
-
-### 2.1 Main/coordinator
+## 2. Exact current source evidence
 
 `VERIFIED_SOURCE`
 
-- Repo: `inoriko920-dev/CHATGPT-QUEUE-RUNNER`.
-- Commit baseline: `083ed5030d6a6304e9f720ce6edcec5b4ce83288`.
-- File yang terlihat pada root baseline: hanya tree `docs/`; di dalamnya terdapat `docs/recovery/RECOVERY_ASSIGNMENT.md`.
-- Tidak ada current `extensions/**` pada baseline coordinator yang diaudit Chat 3.
+Chat 1 sekarang telah mengimpor rescue exact pada commit:
 
-### 2.2 Chat 1 source branch gate
+`4719c0e17e83bf03afd141b96156614f83b9631a` — `recovery(chat1): import verified extensions rescue`
 
-`VERIFIED_SOURCE`
+Evidence source:
 
-- Branch `recovery/chat1-source-r0` ada.
-- Branch tersebut diperiksa dua kali selama pekerjaan Chat 3.
-- Pada kedua pemeriksaan root hanya menampilkan `docs/`; `extensions/**` belum tersedia.
-- Akibatnya source recovered tidak dapat dijadikan target current syntax/behavior test pada run ini.
+- rescue SHA-256: `f46767d61dff61c2b0ce7dc413fc7dbe29f78d0029c17a2259d54bd96c5ddd56`;
+- documented expected SHA-256: sama;
+- hash result: `MATCH`;
+- 80 files under `extensions/**`;
+- 10 runner directories `chat-queue-runner-01` s.d. `chat-queue-runner-10`;
+- 8 files per runner: `background.js`, `content.js`, `interruption-bypass.js`, `manifest.json`, `popup.css`, `popup.html`, `popup.js`, `README.md`;
+- APP SOURCE 60, CONFIG 10, DOCS 10;
+- TEST 0, BUILD SCRIPT 0, BUNDLED DEPENDENCY 0, GENERATED 0, BINARY/PORTABLE 0.
+
+Historical audit menyebut 81 files. Rescue exact hanya 80. Identitas/path/content file ke-81 tetap `UNKNOWN`; tidak ada file yang direkonstruksi untuk menutup selisih.
 
 ## 3. Dependency / build / CI inventory
 
-| Item | Current recovery evidence | Historical evidence | Current status |
-|---|---|---|---|
-| `package.json` | tidak terlihat pada current recovery baseline/source branch yang tersedia | audit lama menyatakan tidak ada | `SKIP — source recovery belum tersedia` |
-| lockfile npm/yarn/pnpm | belum dapat diaudit pada source recovered | tidak dilaporkan pada audit lama | `UNKNOWN` |
-| Python requirements | belum dapat diaudit pada source recovered | tidak dilaporkan | `UNKNOWN` |
-| build script | belum dapat diaudit pada source recovered | audit lama menyatakan tidak ada | `SKIP` |
-| workflow CI | belum dapat diaudit pada source recovered | audit lama menyatakan tidak ada | `SKIP` |
-| legacy test suite | belum dapat diaudit pada source recovered | audit lama menyatakan tidak ada | `SKIP` |
-| recovery harness | belum dibuat karena source target belum tersedia | N/A | `NOT RUN` |
-| manifest Runner 01–10 | belum tersedia di Chat 1 branch saat audit | versi lama dilaporkan 0.1.8 | `SKIP` |
-| generator/package script | belum dapat diverifikasi | audit lama menyatakan build generator tidak ada | `UNKNOWN / NOT RUN` |
-| Chrome MV3 load-unpacked | source belum tersedia | belum diuji live pada audit lama | `NOT RUN` |
-| ChatGPT live | tidak dijalankan | tidak dijalankan pada audit lama | `NOT RUN` |
-
-Catatan penting: `ABSENT` untuk snapshot lama tidak otomatis berarti `ABSENT` pada rescued snapshot. Current rescued source harus diperiksa setelah Chat 1 commit tersedia.
-
-## 4. Historical test evidence — bukan current PASS
-
-`RECONSTRUCTED_FROM_DOCS`
-
-Master ASTRA 28 September 2026 terhadap repo lama `tonitarung099-creator/ChatGPT-Queue-Runner`, commit `7bcfbf7cdfa87303f21d5f979796200880e355ae`, mendokumentasikan:
-
-- tree 81 file;
-- manifest 0.1.8 untuk Runner 01–10;
-- 40 file JavaScript lulus `node --check`;
-- harness Node VM lama mereproduksi 13 kasus state-machine + 12 kasus DOM sintetis = 25 reproduksi;
-- reproduksi itu mengonfirmasi behavior salah pada baseline lama dan bukan regression test yang menyatakan bug sudah diperbaiki;
-- tidak ada Chrome extension integration nyata;
-- tidak ada ChatGPT live test.
-
-Karena current rescued source belum hadir, hasil historis di atas tidak dipromosikan menjadi current recovery result.
-
-## 5. Historical behavior evidence yang perlu dipertahankan sebagai target verifikasi
-
-`RECONSTRUCTED_FROM_DOCS`
-
-Audit lama mencatat reproduksi behavior berikut pada baseline lama:
-
-- B01 launcher continue memanggil `queuesMatch` yang tidak tersedia di content-script scope;
-- B02 pause saat wait masih dapat diikuti send;
-- B02 reset saat wait masih dapat diikuti send/state mutation;
-- B03 late replacement response dapat menghidupkan kembali reset session;
-- B04 navigasi ke percakapan berbeda masih dapat mengirim queue;
-- B05 user prompt accepted tanpa assistant dapat hang tanpa timeout;
-- B06 old assistant response dapat dianggap completion untuk item baru yang gagal;
-- B07 detached composer dapat dianggap accepted tanpa turn;
-- B08 send dapat menimpa manual draft;
-- B09 pending replacement dapat memulai paused queue sebelum block check;
-- B10 resume setelah uncertain send dapat mengirim ulang prompt yang sudah accepted;
-- B11 `sawGenerating` tidak persisted sebelum reload;
-- B12 dua runner independen dapat sama-sama send pada tab yang sama;
-- B13 hidden regenerate dari old turn dapat menandai latest turn complete, direproduksi pada Runner 01–10;
-- B14 approval offscreen/text-only tidak terdeteksi.
-
-Status current: seluruh item `NOT RUN` terhadap rescued source.
-
-## 6. Commands dan execution record
-
-### 6.1 Command yang dijalankan / evidence retrieval
-
-Pada sesi Chat 3, evidence current diperoleh melalui GitHub repository/branch inspection, bukan local clone/build execution.
-
-Branch/source check yang ekuivalen dengan target verifikasi lokal:
-
-```powershell
-git fetch origin main recovery/chat1-source-r0 recovery/chat3-test-build-r0
-git ls-tree -r --name-only origin/main
-git ls-tree -r --name-only origin/recovery/chat1-source-r0
-```
-
-Current observed result: source `extensions/**` belum hadir pada branch Chat 1.
-
-### 6.2 Commands yang belum dijalankan karena dependency source tidak tersedia
-
-```powershell
-node --version
-Get-ChildItem -Recurse -Filter *.js extensions | ForEach-Object { node --check $_.FullName }
-```
-
-Result: `SKIP — no recovered JS source available to Chat 3 at audit time`.
-
-Tidak ada perintah test/harness yang dijalankan, sehingga tidak ada `PASS` mock/regression.
-
-## 7. PASS / FAIL / SKIP / NOT RUN matrix
-
-| Layer | Result | Alasan |
+| Item | Exact rescue result | Status |
 |---|---|---|
-| Recovery assignment readable | `PASS` | coordinator file tersedia dan dibaca |
-| Chat 3 worker branch writable | `PASS` | recovery docs berhasil ditulis pada branch worker |
-| Chat 1 source dependency present | `FAIL` sebagai gate / bukan source failure | branch ada tetapi source belum hadir saat audit |
-| Current dependency inventory | `SKIP` | source rescued belum tersedia |
-| Current manifest/version verification | `SKIP` | `manifest.json` belum tersedia |
-| Current `node --check` | `SKIP` | tidak ada recovered JS yang dapat diuji |
-| Legacy/current automated test suite | `SKIP` | legacy test suite historically absent; current source belum tersedia |
-| Reconstructed recovery harness | `NOT RUN` | sengaja belum dibuat agar tidak menguji behavior tebakan |
-| Chrome load-unpacked | `NOT RUN` | source package tidak tersedia |
-| Chrome MV3 service worker/reload | `NOT RUN` | Chrome integration tidak dijalankan |
-| ChatGPT live normal queue | `NOT RUN` | live test tidak dijalankan |
-| ChatGPT live interruption/approval | `NOT RUN` | live test tidak dijalankan |
-| Packaging 10 runner | `NOT RUN` | rescued source/layout belum tersedia |
+| `package.json` | tidak ada di rescue | `ABSENT` |
+| npm/yarn/pnpm lockfile | tidak ada di rescue | `ABSENT` |
+| Python requirements | tidak ada di rescue | `ABSENT` |
+| legacy test files | count 0 | `ABSENT` |
+| build script / generator | count 0 | `ABSENT` |
+| bundled dependency/vendor | count 0 | `ABSENT` |
+| binary / executable portable | count 0 | `ABSENT` |
+| extension manifests | 10 | `PRESENT` |
+| app source `.js/.css/.html` | 60 | `PRESENT` |
+| docs README | 10 | `PRESENT` |
+| GitHub Actions workflow in rescue | bukan bagian rescue | `ABSENT FROM RESCUE` |
 
-Keterangan: baris `Chat 1 source dependency present` adalah kegagalan gate ketersediaan dependency pada saat audit, bukan klaim bahwa source rescue rusak atau gagal dipulihkan.
+Catatan: `ABSENT` berarti tidak ada pada verified 80-file rescue snapshot, bukan klaim bahwa file tersebut tidak pernah ada dalam seluruh sejarah proyek.
 
-## 8. Portable / package behavior evidence
+## 4. Manifest verification
 
-### Current
+`VERIFIED_SOURCE`
 
-`UNKNOWN / NOT RUN`
+Chat 1 memverifikasi 10/10 manifest parse dan memiliki:
 
-Chat 3 tidak memiliki `extensions.zip` sebagai input langsung pada sesi ini dan source Chat 1 belum di-import. Karena itu Chat 3 tidak mengklaim membuka, mengekstrak, atau menjalankan portable/package rescue.
+- `manifest_version: 3`;
+- version `0.1.8`;
+- service worker `background.js`;
+- popup `popup.html`;
+- content scripts dalam urutan `interruption-bypass.js`, `content.js`.
 
-### Historical/documented
+Chat 3 juga membuka langsung manifest Runner 01 pada exact commit source dan mengonfirmasi struktur tersebut.
+
+Result: `PASS — source structure/version evidence`.
+
+## 5. JavaScript syntax evidence
+
+### 5.1 Current source worker execution
+
+`VERIFIED_SOURCE / STATIC`
+
+Chat 1 benar-benar menjalankan `node --check` terhadap seluruh recovered JavaScript files:
+
+- Node: `v22.16.0`
+- JavaScript checked: 40
+- PASS: 40
+- FAIL: 0
+
+Result: `PASS 40/40`, dengan scope **syntax/static only**.
+
+### 5.2 Independent Chat 3 execution attempt
+
+Chat 3 mencoba memperoleh checkout lokal exact branch untuk rerun independen. Command ekuivalen:
+
+```bash
+git clone --branch recovery/chat1-source-r0 --single-branch \
+  https://github.com/inoriko920-dev/CHATGPT-QUEUE-RUNNER.git
+```
+
+Environment eksekusi menolak network/DNS ke `github.com` (`Could not resolve host: github.com`). Source tetap dapat dibaca melalui GitHub connector, tetapi connector tidak menyediakan checkout filesystem langsung untuk proses `node` lokal.
+
+Karena itu Chat 3 **tidak** menulis independent `PASS` kedua.
+
+Result independent Chat 3: `SKIP — exact source checkout unavailable in execution environment`.
+
+## 6. Reconstructed snapshot verifier
+
+Chat 3 menambahkan:
+
+`recovery-tests/verify-recovered-snapshot.mjs`
+
+Label:
+
+- `PROVENANCE: RECONSTRUCTED_FROM_DOCS`
+- `LEGACY_TEST: false`
+- target source commit `4719c0e17e83bf03afd141b96156614f83b9631a`
+
+Harness memeriksa:
+
+- exact Runner 01–10 layout;
+- exact expected files per runner;
+- SHA-256 file shared, interruption variants, dan runner-specific manifests;
+- manifest MV3/version/service worker/popup/content scripts;
+- `node --check` terhadap 40 JS;
+- exact count 40 JS.
+
+Command setelah source dan harness berada di working tree yang sama:
+
+```powershell
+node .\recovery-tests\verify-recovered-snapshot.mjs .\extensions
+```
+
+Status run terhadap exact source saat Chat 3 handoff ini: `NOT RUN / SKIP`, karena source commit dan harness berada pada worker branches terpisah dan local checkout GitHub tidak tersedia di execution environment.
+
+Harness ini **bukan** behavior regression test dan tidak membuktikan Chrome/ChatGPT runtime.
+
+## 7. Historical behavior evidence — tetap bukan current PASS
 
 `RECONSTRUCTED_FROM_DOCS`
 
-Coordinator assignment mendokumentasikan rescue `extensions.zip` sebagai:
+Master ASTRA lama terhadap repo lama/commit `7bcfbf7cdfa87303f21d5f979796200880e355ae` mencatat 25 reproduksi controlled/mock yang antara lain mencakup B01–B14: missing `queuesMatch` scope, pause/reset race, late replacement, cross-conversation send, timeout/old response confusion, detached composer, manual draft overwrite, uncertain resend, reload persistence, multi-runner collision, hidden regenerate, dan approval detection.
 
-- 80 file + 11 direktori;
-- Runner 01–10;
-- tanpa `.git`;
-- SHA-256 terdokumentasi `f46767d61dff61c2b0ce7dc413fc7dbe29f78d0029c17a2259d54bd96c5ddd56`;
-- status `RESCUED PARTIAL SNAPSHOT` sampai gap 81 vs 80 direkonsiliasi.
+Reproduksi lama sengaja membuktikan baseline behavior bermasalah. Ia bukan recovered legacy test suite dan bukan bukti B01–B19 sudah diperbaiki.
 
-Historical target packaging adalah Chrome extension folder/ZIP siap `Load unpacked`, bukan executable Windows.
+Current rescued source behavior status: `NOT RUN`.
 
-Tidak ada current behavior PASS yang diturunkan dari rescue ZIP pada run Chat 3 ini.
+## 8. PASS / FAIL / SKIP / NOT RUN matrix
 
-## 9. Missing test/build files / unresolved evidence
+| Layer | Result | Evidence |
+|---|---|---|
+| Coordinator assignment readable | `PASS` | baseline coordinator dibaca |
+| Exact Chat 1 source dependency | `PASS` | commit `4719c0e...` tersedia |
+| Rescue SHA identity | `PASS` | documented hash `MATCH` |
+| 10 runner / 80 file inventory | `PASS` | verified source inventory |
+| Dependency/build/test inventory | `PASS` | 0 test/build/dependency/binary dalam rescue |
+| 10 manifests parse | `PASS` | Chat 1 source verification |
+| Manifest MV3/version 0.1.8 | `PASS` | 10/10 source evidence |
+| Current JS syntax | `PASS 40/40` | executed by Chat 1, Node v22.16.0 |
+| Independent Chat 3 syntax rerun | `SKIP` | local source checkout blocked by environment network |
+| Chat 3 snapshot harness | `NOT RUN` against source | branch separation + no local checkout |
+| Behavior mock/regression | `NOT RUN` | no new behavior harness executed |
+| Chrome `Load unpacked` | `NOT RUN` | browser integration not executed |
+| MV3 service worker/reload | `NOT RUN` | browser integration not executed |
+| ChatGPT live normal queue | `NOT RUN` | live page not exercised |
+| ChatGPT interruption/approval | `NOT RUN` | live page not exercised |
+| Final package ZIP | `NOT RUN` | Chat 3 tidak membangun final package |
 
-Sampai source Chat 1 tersedia, item berikut belum dapat diverifikasi pada rescued snapshot:
+Tidak ada behavior test current yang berstatus FAIL. Historical bug reproductions tetap historical evidence.
 
-1. apakah `package.json` benar-benar tidak ada;
-2. apakah ada lockfile atau dependency metadata lain;
-3. apakah ada `.github/workflows/**`;
-4. apakah ada build/package/generator script;
-5. apakah ada legacy test file tersembunyi di rescue;
-6. jumlah dan path tepat semua JS recovered;
-7. manifest/version setiap Runner 01–10;
-8. apakah tree rescue 80 file memiliki file build/test yang berbeda dari tree lama 81 file;
-9. launcher/server component dan requirement aktualnya;
-10. browser/Chrome minimum version;
-11. status MV3 service worker setelah sleep/restart;
-12. compatibility selector ChatGPT current;
-13. locale Bahasa Indonesia/Inggris;
-14. behavior file/tool output dan long conversation;
-15. package ZIP final dan checksum current.
+## 9. Portable/package evidence
 
-## 10. Known platform limitations dari evidence lama
+Rescue source adalah Chrome extension source tree, bukan Windows executable.
 
-`RECONSTRUCTED_FROM_DOCS`
+- verified rescue: 80 files / 10 runners;
+- binary/portable executable: 0;
+- target historical distribution: extension folder/ZIP siap `Load unpacked`;
+- actual Chrome load-unpacked pada current recovered source: `NOT RUN`.
 
-Belum pernah dibuktikan pada current recovery:
+Jangan menyebut source berasal dari artifact build; provenance adalah rescue source ZIP yang diverifikasi Chat 1.
+
+## 10. Cross-runner drift relevant to test
+
+Verified rescue menunjukkan:
+
+- byte-identical Runner 01–10: `background.js`, `content.js`, `popup.css`, `popup.html`, `popup.js`, `README.md`;
+- `interruption-bypass.js`: 6 unique payloads; Runner 01–05 masing-masing berbeda, Runner 06–10 identik;
+- `manifest.json`: runner-specific, seluruhnya version `0.1.8`.
+
+Karena itu behavior testing tidak boleh hanya menganggap semua file byte-identical. Minimal interruption variants dan manifest identities harus tetap tercakup.
+
+## 11. Known platform limitations — current status
+
+Masih `NOT RUN / UNKNOWN` terhadap runtime current:
 
 - React/ProseMirror behavior nyata;
-- Chrome MV3 isolated world sebenarnya;
+- Chrome MV3 isolated world;
 - service worker restart;
 - tab throttling/background sleep/wake;
-- virtualized long conversations;
-- selector pada ChatGPT terkini;
+- virtualized long conversation;
+- current ChatGPT selectors;
 - file/tool/image output;
-- launcher localhost endpoint contract end-to-end;
-- dua runner nyata pada tab yang sama;
-- UI locale variants.
+- locale Bahasa Indonesia/Inggris;
+- launcher localhost endpoint end-to-end;
+- dua runner nyata pada tab sama.
 
-## 11. Next gate untuk Chat 5
+## 12. Next integration gate
 
-Setelah Chat 1 mengirim commit source:
+Chat 5 harus:
 
-1. rekam SHA Chat 1;
-2. audit tree/dependency/build/test/CI aktual;
-3. jalankan `node --check` pada seluruh recovered JS;
-4. bandingkan jumlah JS/current manifest dengan historical evidence;
-5. hanya bila source mendukung, buat reconstructed harness di `recovery-tests/**`;
-6. jalankan mock regression dan simpan logs;
-7. lakukan Chrome integration secara terpisah;
-8. lakukan ChatGPT live smoke secara terpisah;
-9. jangan merge worker branch otomatis; handoff ke Chat 5 terlebih dahulu.
+1. review/integrasikan Chat 1 source commit first;
+2. integrasikan Chat 3 docs + reconstructed snapshot verifier;
+3. jalankan `node recovery-tests/verify-recovered-snapshot.mjs extensions` pada combined exact tree;
+4. simpan logs dan integrated SHA;
+5. setelah static gate PASS, lanjutkan mock/regression behavior;
+6. Chrome integration dan ChatGPT live tetap layer tersendiri;
+7. jangan mengarang historical file ke-81.
