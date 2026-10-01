@@ -2,178 +2,164 @@
 
 Tanggal: 2026-10-01
 Branch: `recovery/chat3-test-build-r0`
-Status dokumen: `RECONSTRUCTED_FROM_DOCS`
+Status: `RECONSTRUCTED_FROM_DOCS`, diperbarui setelah source Chat 1 tersedia.
 
-## 1. Tujuan
+## 1. Tujuan dan aturan hasil
 
-Dokumen ini mendefinisikan cara membuktikan snapshot recovery ChatGPT Queue Runner bekerja tanpa mengubah core source dan tanpa menganggap evidence audit lama sebagai test suite recovered.
+Dokumen ini mendefinisikan cara membuktikan snapshot recovery ChatGPT Queue Runner bekerja tanpa mengubah core source dan tanpa mengubah evidence historis menjadi klaim current PASS.
 
-Aturan utama:
+- `PASS`: test/check benar-benar dijalankan terhadap source yang dapat diidentifikasi, atau evidence source worker yang eksplisit disebut sebagai evidence worker tersebut.
+- `FAIL`: command/check benar-benar dijalankan dan gagal.
+- `SKIP`: sengaja tidak dijalankan karena dependency/environment tidak tersedia.
+- `NOT RUN`: belum ada eksekusi untuk layer tersebut.
+- Harness recovery baru hanya di `recovery-tests/**` dan wajib dilabeli reconstructed.
+- Syntax/static, mock/regression, Chrome integration, dan ChatGPT live selalu dilaporkan terpisah.
 
-- `PASS` hanya boleh dipakai untuk test yang benar-benar dijalankan pada source recovery yang dapat diidentifikasi.
-- `FAIL` hanya dipakai bila command/test benar-benar dijalankan dan gagal.
-- `SKIP` dipakai bila test sengaja tidak dijalankan karena dependency belum tersedia.
-- `NOT RUN` dipakai bila belum ada eksekusi pada sesi/commit yang dilaporkan.
-- Harness baru di masa recovery harus berada di `recovery-tests/**` dan dilabeli `RECONSTRUCTED_FROM_DOCS` atau `RECONSTRUCTED_FROM_BEHAVIOR`.
-- Chrome integration dan ChatGPT live tidak boleh dianggap lulus hanya karena static/mock test lulus.
+## 2. Exact recovered source gate
 
-## 2. Baseline evidence
+Source recovery Chat 1 sekarang tersedia.
 
-### 2.1 Current recovery repository
+- Branch: `recovery/chat1-source-r0`
+- Exact source commit: `4719c0e17e83bf03afd141b96156614f83b9631a`
+- Commit message: `recovery(chat1): import verified extensions rescue`
+- Rescue provenance: `VERIFIED_SOURCE`
+- Rescue SHA-256: `f46767d61dff61c2b0ce7dc413fc7dbe29f78d0029c17a2259d54bd96c5ddd56`
+- Hash terhadap expected rescue: `MATCH`
+- Layout: 10 runner × 8 files = 80 files
+- APP SOURCE: 60; CONFIG: 10; DOCS: 10
+- TEST: 0; BUILD SCRIPT: 0; BUNDLED DEPENDENCY: 0; GENERATED: 0; BINARY/PORTABLE: 0
+- Historical 81-file tree masih berbeda satu file; path/content file ke-81 tetap `UNKNOWN` dan tidak boleh direkonstruksi dari tebakan.
 
-`VERIFIED_SOURCE` untuk state repo recovery saat audit Chat 3:
+Chat 1 juga mencatat seluruh 10 manifest parse sebagai MV3 version `0.1.8`, menggunakan `background.js`, `popup.html`, serta content scripts `interruption-bypass.js` + `content.js`.
 
-- coordinator commit: `083ed5030d6a6304e9f720ce6edcec5b4ce83288` (`recovery: add R0 worker assignment`);
-- current `main` hanya memiliki `docs/recovery/RECOVERY_ASSIGNMENT.md` di bawah tree yang terlihat;
-- branch `recovery/chat1-source-r0` sudah ada, tetapi pada audit Chat 3 belum memiliki `extensions/**`;
-- karena source belum masuk ke branch Chat 1, syntax/static test terhadap recovered JS belum dapat dijalankan secara jujur.
+## 3. Dependency/build/CI model recovered
 
-### 2.2 Historical ASTRA audit
+Berdasarkan exact rescue 80-file source:
 
-`RECONSTRUCTED_FROM_DOCS` dari master audit 28 September 2026, repo lama `tonitarung099-creator/ChatGPT-Queue-Runner`, commit `7bcfbf7cdfa87303f21d5f979796200880e355ae`:
+- `package.json`: absent dari rescue.
+- npm/yarn/pnpm lockfile: absent dari rescue.
+- Python requirements: absent dari rescue.
+- legacy test suite: absent dari rescue.
+- build script/generator: absent dari rescue.
+- bundled dependency/vendor package: absent dari rescue.
+- workflow CI: tidak termasuk rescue source; coordinator repo juga tidak menyediakan workflow untuk aplikasi pada baseline R0.
+- compile/build step: tidak terbukti diperlukan; bentuk source adalah Chrome MV3 extension folders.
+- target historical packaging: Runner 01–10 siap `Load unpacked`, bukan EXE.
 
-- manifest version dilaporkan `0.1.8`;
-- 10 runner extension;
-- tree lama dilaporkan 81 file;
-- tidak ada `AGENTS.md`, test suite, `package.json`, build script, atau workflow CI;
-- 40 file JavaScript dilaporkan lulus `node --check`;
-- harness Node VM lama mereproduksi 13 state-machine case + 12 synthetic DOM case = 25 skenario reproduksi;
-- audit lama tidak melakukan Chrome extension integration nyata atau pengiriman prompt ke akun ChatGPT nyata.
+Absence di atas adalah fakta snapshot rescue, bukan klaim mengenai seluruh sejarah repo lama.
 
-Evidence ini **bukan** current recovery PASS.
+## 4. Syntax/static gate
 
-## 3. Model build/release yang harus diverifikasi
+### Evidence dari Chat 1
 
-Status awal: `UNKNOWN` sampai Chat 1 source tersedia.
+Chat 1 menjalankan `node --check` terhadap seluruh 40 recovered JavaScript files:
 
-Historical docs menunjukkan target paket adalah Chrome extension Runner 01–10 yang siap `Load unpacked`, bukan EXE. Tidak ada bukti adanya compile step atau dependency install step pada baseline lama.
+- Node: `v22.16.0`
+- JS checked: 40
+- PASS: 40
+- FAIL: 0
 
-Setelah source Chat 1 tersedia, Chat 3 harus menginventarisasi:
+Ini adalah current recovered-source syntax evidence, tetapi eksekusinya berasal dari worker Chat 1. Chat 3 tidak mengubahnya menjadi behavior PASS.
 
-1. `manifest.json` semua Runner 01–10;
-2. versi manifest aktual;
-3. semua `.js`, `.html`, `.css`, README/config yang masuk paket;
-4. `package.json`, lockfile, requirements, vendor dependency, bila ternyata ada;
-5. `.github/workflows/**`, bila ada;
-6. generator/build/packaging script, bila ada;
-7. launcher/local endpoint dependency bila ada di source/docs;
-8. executable/binary, bila ada;
-9. perbedaan file antar-runner yang berdampak pada test matrix.
+### Harness Chat 3
 
-## 4. Tahapan validasi recovery
+Chat 3 menambahkan:
 
-### Phase A — Source gate / inventory
+`recovery-tests/verify-recovered-snapshot.mjs`
 
-Prasyarat: branch Chat 1 sudah memiliki commit source recovered.
-
-Commands contoh:
-
-```powershell
-git fetch origin recovery/chat1-source-r0
-git ls-tree -r --name-only origin/recovery/chat1-source-r0
-```
-
-Catat commit SHA yang diuji. Jangan menguji branch floating tanpa merekam SHA.
-
-Acceptance:
-
-- tree source dapat diidentifikasi;
-- manifest Runner 01–10 dapat ditemukan bila memang tersedia;
-- file build/test/CI diklasifikasikan `PRESENT`, `ABSENT`, atau `UNKNOWN` berdasarkan tree nyata.
-
-### Phase B — Syntax/static validation
-
-Prasyarat: recovered JS tersedia.
-
-PowerShell:
-
-```powershell
-$files = git ls-tree -r --name-only <CHAT1_SHA> | Where-Object { $_ -match '\.js$' }
-foreach ($f in $files) {
-  git show "<CHAT1_SHA>:$f" | node --check -
-  if ($LASTEXITCODE -ne 0) { throw "node --check failed: $f" }
-}
-```
-
-Alternatif bila source sudah di-checkout lokal:
-
-```powershell
-Get-ChildItem -Recurse -Filter *.js extensions | ForEach-Object {
-  node --check $_.FullName
-  if ($LASTEXITCODE -ne 0) { throw "node --check failed: $($_.FullName)" }
-}
-```
-
-Wajib catat:
-
-- `node --version`;
-- OS;
-- source commit SHA;
-- jumlah JS yang diperiksa;
-- file yang gagal, bila ada.
-
-`node --check` hanya memberi status syntax/static, bukan behavior PASS.
-
-### Phase C — Reconstructed deterministic regression harness
-
-Hanya dibuat setelah source nyata tersedia dan fungsi/kontrak yang diuji dapat ditautkan ke source tersebut.
-
-Lokasi yang diizinkan: `recovery-tests/**`.
-
-Setiap file harness wajib menyatakan:
+Provenance di file:
 
 ```text
 PROVENANCE: RECONSTRUCTED_FROM_DOCS
 LEGACY_TEST: false
-SOURCE_UNDER_TEST: <commit SHA + path>
+SOURCE_UNDER_TEST: Chat 1 commit 4719c0e17e83bf03afd141b96156614f83b9631a
 ```
 
-Harness boleh mock boundary seperti DOM, `chrome.storage`, `chrome.runtime`, timer, dan send button, tetapi hasilnya harus dilaporkan sebagai **mock/regression**, bukan Chrome/live.
+Harness memverifikasi:
 
-Dilarang menulis harness yang hanya memvalidasi asumsi tentang behavior yang tidak dapat diturunkan dari source/evidence.
+1. directory Runner 01–10 tepat;
+2. tiap runner berisi tepat 8 expected files;
+3. SHA-256 shared files sesuai verified rescue;
+4. enam variant `interruption-bypass.js` sesuai rescue;
+5. 10 manifest runner-specific sesuai rescue;
+6. manifest MV3 version `0.1.8`, service worker, popup, dan content script order;
+7. `node --check` pada 40 JS.
 
-### Phase D — Chrome extension integration
+Run lokal setelah Chat 1 source dan Chat 3 harness berada pada working tree yang sama:
+
+```powershell
+node .\recovery-tests\verify-recovered-snapshot.mjs .\extensions
+```
+
+atau Bash:
+
+```bash
+node recovery-tests/verify-recovered-snapshot.mjs extensions
+```
+
+Chat 3 tidak mengklaim harness PASS sampai command tersebut benar-benar berjalan terhadap exact source tree.
+
+## 5. Current environment limitation
+
+Pada sesi Chat 3, exact source dapat dibaca melalui GitHub connector, tetapi environment eksekusi lokal tidak dapat melakukan `git clone` dari `github.com` karena DNS/network egress diblok. Karena itu independent local rerun Chat 3 terhadap seluruh source tree belum dilakukan.
+
+Status jujur:
+
+- source/inventory: `PASS` berdasarkan exact Chat 1 source evidence;
+- Chat 1 syntax run: `PASS 40/40`;
+- independent Chat 3 harness run terhadap source: `SKIP — source checkout unavailable in execution environment`;
+- Chrome integration: `NOT RUN`;
+- ChatGPT live: `NOT RUN`.
+
+## 6. Reconstructed deterministic behavior harness policy
+
+Snapshot verifier di atas hanya static/integrity harness. Behavior regression harness baru boleh ditambah jika ia mengeksekusi fungsi/kontrak yang benar-benar diturunkan dari source exact commit.
+
+Bila dibuat, mock boundary dapat mencakup DOM, `chrome.storage`, `chrome.runtime`, timer, dan send button. Hasil wajib dilabeli **mock/regression**, bukan Chrome/live.
+
+Jangan membuat regression test yang sekadar mengabadikan bug lama sebagai desired behavior.
+
+## 7. Chrome extension integration
 
 Prasyarat:
 
-- source/package sudah teridentifikasi;
-- manifest valid;
-- folder Runner yang diuji jelas;
-- Chrome tersedia di environment yang menjalankan test.
+- source Chat 1 dan harness Chat 3 telah terintegrasi dalam review tree;
+- Chrome tersedia;
+- folder runner yang diuji jelas.
 
-Minimum manual/integration checklist:
+Minimum checklist:
 
-1. setiap Runner 01–10 dapat dipilih lewat `Load unpacked`;
+1. Runner 01–10 dapat `Load unpacked`;
 2. tidak ada manifest/service-worker error saat load;
-3. popup dapat dibuka;
-4. content script benar-benar terinjeksi pada target yang diizinkan;
-5. state/storage messaging bekerja pada skenario fixture atau halaman aman;
-6. dua runner pada tab sama tidak menghasilkan double-send bila behavior itu sudah menjadi acceptance target;
-7. background tab / reload / service worker restart dicatat sebagai hasil nyata, bukan asumsi.
+3. popup terbuka;
+4. content scripts terinjeksi pada host yang diizinkan;
+5. storage/runtime messaging bekerja;
+6. reload/background/service-worker restart dicatat;
+7. dua runner pada tab sama diuji bila behavior coordination sudah diimplementasikan.
 
-Status harus `NOT RUN` bila Chrome environment tidak benar-benar dipakai.
+Status saat ini: `NOT RUN`.
 
-### Phase E — ChatGPT live smoke
+## 8. ChatGPT live smoke
 
-Ini kategori terpisah dari Chrome integration.
-
-Gunakan prompt uji sederhana; jangan gunakan antrean pengguna asli sebagai test data tanpa kebutuhan/otorisasi.
+Harus terpisah dari Chrome integration. Gunakan prompt uji sederhana, bukan antrean pengguna asli.
 
 Minimum smoke:
 
 - normal multi-prompt;
 - pause/reset saat menunggu;
-- interruption/failed behavior;
+- interruption/failed;
 - approval/confirmation pause;
 - navigation ke percakapan lain;
-- draft manual tidak tertimpa;
-- tidak ada duplicate send.
+- manual draft preservation;
+- duplicate-send prevention.
 
-Catat locale, browser version, tanggal, dan keterbatasan selector. Bila tidak dijalankan, status `NOT RUN`.
+Catat browser version, locale, tanggal, target commit, dan keterbatasan selector.
 
-## 5. Acceptance matrix recovered dari dokumen lama
+Status saat ini: `NOT RUN`.
 
-Status seluruh item di bawah pada awal Recovery R0: `RECONSTRUCTED_FROM_DOCS / NOT RUN` sampai diuji pada source recovery.
+## 9. Acceptance matrix T01–T30
+
+Semua item berikut berasal dari master ASTRA dan tetap `RECONSTRUCTED_FROM_DOCS / NOT RUN` sampai behavior diuji pada implementation yang relevan:
 
 - T01 Normal: 3 prompt berurutan; tepat 3 send, urutan benar, tidak mendahului respons.
 - T02 Respons selesai sangat cepat di antara polling; tetap dikenali tanpa duplikat.
@@ -204,30 +190,28 @@ Status seluruh item di bawah pada awal Recovery R0: `RECONSTRUCTED_FROM_DOCS / N
 - T27 10 paket hasil generator konsisten dan masing-masing dapat Load unpacked.
 - T28 Upgrade state 0.1.8, storage write failure, stale state event: tidak merusak antrean.
 - T29 Background tab/sleep/wake/Chrome service worker restart: ukur dan dokumentasikan batas nyata.
-- T30 Selector pada ChatGPT Bahasa Indonesia/Inggris, chat panjang, file/tool output: uji live terpisah.
+- T30 Selector ChatGPT Bahasa Indonesia/Inggris, chat panjang, file/tool output: uji live terpisah.
 
-Catatan: 25 skenario reproduksi audit lama bukan test suite recovered. T01–T30 adalah acceptance matrix untuk pekerjaan validasi/perbaikan berikutnya.
+25 reproduksi audit lama tetap historical reproduction evidence, bukan current recovered test suite.
 
-## 6. Result taxonomy
+## 10. Result taxonomy
 
-Setiap laporan wajib memisahkan baris berikut:
+| Layer | Current status |
+|---|---|
+| Exact rescue/source inventory | `PASS` |
+| Manifest structure/version | `PASS` — source evidence Chat 1 |
+| JS syntax | `PASS 40/40` — executed by Chat 1 |
+| Chat 3 reconstructed snapshot harness | `SKIP / NOT RUN against source` |
+| Behavior mock/regression | `NOT RUN` |
+| Chrome MV3 integration | `NOT RUN` |
+| ChatGPT live | `NOT RUN` |
+| Load-unpacked Runner 01–10 | `NOT RUN` |
 
-| Layer | Contoh | Status yang valid |
-|---|---|---|
-| Source/inventory | manifest/tree/dependency | PASS/FAIL/SKIP/NOT RUN |
-| Syntax/static | `node --check` | PASS/FAIL/SKIP/NOT RUN |
-| Mock/regression | Node VM / fixture | PASS/FAIL/SKIP/NOT RUN |
-| Chrome integration | MV3/load-unpacked/storage/service worker | PASS/FAIL/SKIP/NOT RUN |
-| ChatGPT live | selector + real page + real responses | PASS/FAIL/SKIP/NOT RUN |
-| Packaging | 10 runner ZIP/layout | PASS/FAIL/SKIP/NOT RUN |
-
-## 7. Evidence record template
-
-Untuk setiap run:
+## 11. Evidence record template
 
 ```text
 DATE:
-WORKER: Chat 3 / SOL-C
+WORKER:
 SOURCE_BRANCH:
 SOURCE_COMMIT:
 OS:
@@ -241,14 +225,11 @@ ARTIFACTS/LOGS:
 LIMITATIONS:
 ```
 
-## 8. Current gate
+## 12. Gate berikutnya untuk Chat 5
 
-Pada audit Chat 3 2026-10-01, branch Chat 1 belum memiliki source recovered. Karena itu:
-
-- syntax/static: `SKIP — source dependency unavailable`;
-- mock/regression: `NOT RUN`;
-- Chrome integration: `NOT RUN`;
-- ChatGPT live: `NOT RUN`;
-- packaging: `NOT RUN`.
-
-Langkah berikutnya setelah Chat 1 commit source adalah menjalankan Phase A lalu Phase B sebelum membuat harness baru apa pun.
+1. Integrasikan/review Chat 1 source commit lebih dulu.
+2. Integrasikan Chat 3 harness/docs tanpa mengubah source.
+3. Pada combined working tree jalankan `node recovery-tests/verify-recovered-snapshot.mjs extensions`.
+4. Simpan stdout/stderr dan exact integrated commit SHA.
+5. Baru lanjut ke deterministic behavior regression, Chrome integration, lalu ChatGPT live sebagai layer terpisah.
+6. Jangan menutup gap 81-vs-80 dengan file tebakan.
