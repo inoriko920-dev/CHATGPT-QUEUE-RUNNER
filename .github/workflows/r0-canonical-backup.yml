@@ -1,0 +1,97 @@
+name: R0 Canonical Backup Verification
+
+on:
+  push:
+    branches:
+      - recovery/r0-backup-ci
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  canonical-backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout canonical R0 documentation checkpoint
+        uses: actions/checkout@v4
+        with:
+          ref: 3328164272e2eda47fdcf15ee13123e525e945f1
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Fetch all repository refs for bundle coverage
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --prune origin '+refs/heads/*:refs/remotes/origin/*' '+refs/tags/*:refs/tags/*'
+          git status --porcelain
+          test -z "$(git status --porcelain)"
+          test "$(git rev-parse HEAD)" = "3328164272e2eda47fdcf15ee13123e525e945f1"
+
+      - name: Run reconstructed R0 snapshot verifier
+        shell: bash
+        run: node recovery-tests/verify-recovered-snapshot.mjs
+
+      - name: Create canonical backup set
+        id: backup
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $root = Join-Path $env:RUNNER_TEMP 'cqr-backups'
+          & ./tools/backup/Backup-Repository.ps1 -RepoPath . -OutputRoot $root *>&1 | Tee-Object -FilePath (Join-Path $env:RUNNER_TEMP 'BACKUP_RUN.log')
+          $dir = Get-ChildItem -LiteralPath $root -Directory | Sort-Object LastWriteTimeUtc | Select-Object -Last 1
+          if (-not $dir) { throw 'Backup directory was not created.' }
+          "backup_dir=$($dir.FullName)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          Copy-Item -LiteralPath (Join-Path $env:RUNNER_TEMP 'BACKUP_RUN.log') -Destination (Join-Path $dir.FullName 'BACKUP_RUN.log')
+
+      - name: Verify hashes and Git bundle
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $dir = '${{ steps.backup.outputs.backup_dir }}'
+          & ./tools/backup/Verify-Backup.ps1 -BackupDir $dir *>&1 | Tee-Object -FilePath (Join-Path $dir 'VERIFY_LOG.txt')
+
+      - name: Restore drill and Git fsck
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $dir = '${{ steps.backup.outputs.backup_dir }}'
+          $restore = Join-Path $env:RUNNER_TEMP 'restore/CHATGPT-QUEUE-RUNNER'
+          & ./tools/backup/Restore-Backup.ps1 -BackupDir $dir -RestorePath $restore *>&1 | Tee-Object -FilePath (Join-Path $dir 'RESTORE_LOG.txt')
+
+          $manifestPath = Join-Path $dir 'BACKUP_MANIFEST.json'
+          $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
+          if ($manifest.backup_status -ne 'VERIFIED') { throw "Manifest status is $($manifest.backup_status), expected VERIFIED." }
+          if ($manifest.source.head_commit -ne '3328164272e2eda47fdcf15ee13123e525e945f1') { throw 'Manifest HEAD does not match canonical checkpoint.' }
+
+          $restoredHead = (git -C $restore rev-parse HEAD).Trim()
+          if ($restoredHead -ne '3328164272e2eda47fdcf15ee13123e525e945f1') { throw "Restored HEAD mismatch: $restoredHead" }
+
+          $evidence = [ordered]@{
+            schema_version = '1.0'
+            workflow = 'R0 Canonical Backup Verification'
+            github_run_id = $env:GITHUB_RUN_ID
+            github_run_attempt = $env:GITHUB_RUN_ATTEMPT
+            canonical_checkpoint = '3328164272e2eda47fdcf15ee13123e525e945f1'
+            application_checkpoint = '1d1cd6df547673869e1a374fc5320861924689e4'
+            backup_manifest_status = $manifest.backup_status
+            sha256_status = $manifest.verification.sha256
+            bundle_verify_status = $manifest.verification.bundle_verify
+            restore_drill_status = $manifest.verification.restore_drill
+            git_fsck_status = $manifest.verification.git_fsck
+            restored_head_matches_manifest = $manifest.verification.restored_head_matches_manifest
+            source_zip_sha256 = $manifest.artifacts.source_zip.sha256
+            repo_bundle_sha256 = $manifest.artifacts.git_bundle.sha256
+            runner_os = $env:RUNNER_OS
+          }
+          $evidence | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $dir 'CI_EVIDENCE.json') -Encoding utf8
+
+      - name: Upload verified canonical backup artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: CHATGPT-QUEUE-RUNNER-R0-canonical-backup-3328164
+          path: ${{ steps.backup.outputs.backup_dir }}
+          if-no-files-found: error
+          retention-days: 30
