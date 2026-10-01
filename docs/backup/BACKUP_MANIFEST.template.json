@@ -1,0 +1,55 @@
+{
+  "schema_version": "1.0",
+  "project": "CHATGPT-QUEUE-RUNNER",
+  "backup_status": "BACKUP_LOCAL_PENDING",
+  "created_utc": "YYYY-MM-DDTHH:MM:SSZ",
+  "provenance": "RECONSTRUCTED_FROM_DOCS",
+  "source": {
+    "repository": "inoriko920-dev/CHATGPT-QUEUE-RUNNER",
+    "local_clone_path": "REDACT_OR_LOCAL_PATH",
+    "branch": "BRANCH_NAME",
+    "head_commit": "FULL_COMMIT_SHA",
+    "working_tree_clean": null
+  },
+  "artifacts": {
+    "git_bundle": {
+      "file": "repo.bundle",
+      "sha256": "PENDING",
+      "created_with": "git bundle create --all",
+      "verify_status": "NOT_RUN"
+    },
+    "source_zip": {
+      "file": "source.zip",
+      "sha256": "PENDING",
+      "created_with": "git archive HEAD",
+      "scope": "tracked committed files at HEAD"
+    },
+    "checksums": {
+      "file": "SHA256SUMS.txt",
+      "algorithm": "SHA-256"
+    }
+  },
+  "secret_control": {
+    "high_risk_filename_scan": "NOT_RUN",
+    "common_secret_pattern_scan": "NOT_RUN",
+    "dedicated_history_scanner": "NOT_RUN",
+    "notes": "Never place API keys, tokens, cookies, passwords, private keys, or real .env files in backup artifacts."
+  },
+  "verification": {
+    "sha256": "NOT_RUN",
+    "bundle_verify": "NOT_RUN",
+    "restore_drill": "NOT_RUN",
+    "git_fsck": "NOT_RUN",
+    "restored_head_matches_manifest": "NOT_RUN"
+  },
+  "copies": {
+    "working_clone": "LOCAL_PRIMARY",
+    "secondary_media": "PENDING",
+    "offsite": "PENDING"
+  },
+  "retention_class": "RECOVERY_CHECKPOINT",
+  "notes": [
+    "Do not claim VERIFIED until hash, bundle verification, restore drill, fsck, and HEAD comparison have actually passed.",
+    "A second GitHub account is an additional mirror, not an independent 3-2-1 backup."
+  ]
+}
