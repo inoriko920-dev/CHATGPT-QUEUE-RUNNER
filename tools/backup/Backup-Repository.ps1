@@ -54,24 +54,31 @@ if ([string]::IsNullOrWhiteSpace($OutputRoot)) {
 }
 
 $outputFull = [System.IO.Path]::GetFullPath($OutputRoot)
-$repoFullWithSep = $repo.TrimEnd('\', '/') + [System.IO.Path]::DirectorySeparatorChar
-if ($outputFull.StartsWith($repoFullWithSep, [System.StringComparison]::OrdinalIgnoreCase)) {
-    throw "OutputRoot tidak boleh berada di dalam repository. Pilih folder backup di luar repo."
+$trimChars = [char[]]@('\', '/')
+$repoNormalized = $repo.TrimEnd($trimChars)
+$outputNormalized = $outputFull.TrimEnd($trimChars)
+$repoPrefix = $repoNormalized + [System.IO.Path]::DirectorySeparatorChar
+if (
+    $outputNormalized.Equals($repoNormalized, [System.StringComparison]::OrdinalIgnoreCase) -or
+    $outputNormalized.StartsWith($repoPrefix, [System.StringComparison]::OrdinalIgnoreCase)
+) {
+    throw "OutputRoot tidak boleh sama dengan atau berada di dalam repository. Pilih folder backup di luar repo."
 }
 
+# git ls-files always uses forward slashes, including on Windows.
 # Fail closed for obvious tracked secret files.
 $tracked = Invoke-GitChecked -WorkingDirectory $repo -Arguments @("ls-files")
 $highRiskNamePatterns = @(
-    '(^|/|\\)\.env($|\.)',
-    '(^|/|\\)id_rsa$',
-    '(^|/|\\)id_ed25519$',
+    '(^|/)\.env($|\.)',
+    '(^|/)id_rsa$',
+    '(^|/)id_ed25519$',
     '\.(pem|p12|pfx|key)$',
-    '(^|/|\\)(cookies?|credentials?|secrets?)(\.|$)'
+    '(^|/)(cookies?|credentials?|secrets?)(\.|$)'
 )
 
 $badNames = New-Object System.Collections.Generic.List[string]
 foreach ($file in $tracked) {
-    if ($file -match '(^|/|\\)\.env\.example$') { continue }
+    if ($file -match '(^|/)\.env\.example$') { continue }
     foreach ($pattern in $highRiskNamePatterns) {
         if ($file -match $pattern) {
             $badNames.Add($file)
@@ -113,7 +120,7 @@ $manifestPath = Join-Path $backupDir "BACKUP_MANIFEST.json"
 
 try {
     Invoke-GitChecked -WorkingDirectory $repo -Arguments @("bundle", "create", $bundlePath, "--all") | Out-Null
-    $bundleVerify = Invoke-GitChecked -WorkingDirectory $repo -Arguments @("bundle", "verify", $bundlePath)
+    Invoke-GitChecked -WorkingDirectory $repo -Arguments @("bundle", "verify", $bundlePath) | Out-Null
     Invoke-GitChecked -WorkingDirectory $repo -Arguments @("archive", "--format=zip", "--output=$zipPath", "HEAD") | Out-Null
 
     $bundleHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $bundlePath).Hash.ToLowerInvariant()
