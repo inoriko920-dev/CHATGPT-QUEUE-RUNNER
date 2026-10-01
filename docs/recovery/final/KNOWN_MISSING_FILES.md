@@ -1,34 +1,52 @@
 # KNOWN_MISSING_FILES — Recovery R0
 
-Tanggal gate: 2026-10-01
+Tanggal: 2026-10-01
 
-Dokumen ini mencatat yang belum tersedia; daftar ini **bukan** klaim bahwa file tersebut pasti hilang dari rescue asli.
+## Old main v0.1.8 source
 
-## Missing / unavailable pada repo recovery saat gate
+**Tidak ada file source old main v0.1.8 yang masih missing berdasarkan evidence yang sekarang tersedia.**
 
-1. `extensions/**`
-   - Status: `UNKNOWN / NOT PRESENT IN CURRENT RECOVERY REPO`
-   - Dampak: source Runner 01–10 belum dapat diverifikasi, dihitung, di-hash, atau diuji sintaks.
+Rekonsiliasi final:
 
-2. `docs/recovery/chat1/**`
-   - Status: belum ada output/handoff Chat 1.
+- rescue `extensions.zip` = 80 file;
+- old-main `extensions/` tree SHA = `7472f665bb302b673f2c35dd958ca8f040270fa5`;
+- recovery `extensions/` tree SHA = nilai yang sama;
+- old-main root mempunyai satu file tambahan: `README.md`, blob `1e232dd8b29704fc18a37ac156ebd32a4a0b8e94`;
+- root README tersebut telah dipulihkan oleh Chat 5.
 
-3. `docs/recovery/chat2/**`
-   - Status: belum ada output/handoff Chat 2.
+Maka audit lama 81 file direkonsiliasi sebagai 80 extension files + 1 root README. Tidak ada speculative file dibuat.
 
-4. `docs/recovery/chat3/**` dan `recovery-tests/**`
-   - Status: belum ada output/harness Chat 3.
+## Bukan missing, tetapi sengaja tidak masuk R0
 
-5. `docs/recovery/chat4/**` dan `tools/backup/**`
-   - Status: belum ada output/artefak backup Chat 4.
+Old v0.2.0 branch `fix/astra-b01-b19-runner-reliability` @ `a36e4b74645d8c98a1ed9c7a5db4dbd3d3586d98` masih tersedia sebagai verified old source namun **unmerged** terhadap old main. Source itu tidak hilang; ia sengaja tidak dicampur dengan R0 v0.1.8.
 
-6. PR/commit worker berbeda dari baseline
-   - Status: belum ada; seluruh branch worker masih identical dengan `main`.
+## Evidence/artifact yang masih unavailable atau pending
 
-## Historical uncertainty yang wajib dipertahankan
+1. **Current Chrome Load unpacked runtime evidence**
+   - Status: `NOT RUN`.
+   - Bukan source file missing; yang missing adalah bukti integrasi browser current.
 
-Assignment coordinator mencatat audit lama dengan tree 81 file, sementara rescue `extensions.zip` terdokumentasi berisi 80 file. File ke-81 **belum boleh ditebak atau direkonstruksi** sampai Chat 1 memberikan inventory rescue nyata dan evidence pembanding.
+2. **Current ChatGPT live smoke-test evidence**
+   - Status: `NOT RUN`.
 
-## Bukan missing yang boleh direka ulang
+3. **Current launcher localhost end-to-end evidence**
+   - Status: `NOT RUN`.
 
-Jangan membuat file aplikasi baru hanya untuk mengisi jumlah 81. Jika file lama tidak dapat dibuktikan, status akhirnya harus tetap `UNKNOWN` atau `MISSING`, bukan `VERIFIED_SOURCE`.
+4. **Dedicated full-history secret scan report**
+   - Status: `NOT RUN`.
+   - Common source-pattern preflight sudah PASS, tetapi itu tidak menggantikan scanner history dedicated.
+
+5. **Canonical local backup artifacts untuk final R0**
+   - `repo.bundle`: `BACKUP_LOCAL_PENDING`.
+   - `source.zip`: `BACKUP_LOCAL_PENDING`.
+   - actual `BACKUP_MANIFEST.json`: pending.
+   - restore drill evidence: pending.
+   - secondary/offsite copies: pending.
+
+6. **Old release/tag artifact**
+   - GitHub Releases old repo terverifikasi tidak menyediakan release artifact pada recovery session.
+   - Keberadaan old tag yang dapat dipertanggungjawabkan tetap `UNKNOWN` jika tidak didukung evidence langsung.
+
+## Rule
+
+Jangan mengubah evidence/runtime/backup yang pending menjadi source reconstruction. Missing evidence harus tetap ditulis `NOT RUN`, `PENDING`, atau `UNKNOWN` sampai pemeriksaan nyata dilakukan.
