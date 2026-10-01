@@ -24,6 +24,7 @@ Recovery R0 **tidak** meng-upgrade aplikasi ke v0.2.0 dan tidak menambahkan feat
 Di luar source lama v0.1.8, repo baru juga memuat:
 
 - `docs/recovery/**` — assignment, handoff, history, architecture, provenance, state, dan test evidence;
+- `recovery-tests/verify-recovered-snapshot.mjs` — verifier snapshot/static baru, provenance `RECONSTRUCTED_FROM_DOCS`, bukan legacy test;
 - `docs/backup/**` — backup policy + manifest template;
 - `tools/backup/**` — tooling PowerShell backup/verify/restore/copy.
 
@@ -44,6 +45,7 @@ Ia didokumentasikan sebagai high-value recovery evidence tetapi tidak dicampur k
 - source count: 80 PASS;
 - manifest: 10/10 parse PASS, MV3, version 0.1.8;
 - JavaScript syntax: 40/40 PASS (`node --check`, Node v22.16.0);
+- reconstructed snapshot verifier: PASS — 182 checks, 0 failures, 40 JS checked;
 - common secret-pattern scan pada rescue source: 0 hit;
 - Chrome Load unpacked integration: NOT RUN;
 - ChatGPT live: NOT RUN;
