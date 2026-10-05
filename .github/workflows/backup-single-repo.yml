@@ -1,0 +1,298 @@
+name: Backup CHATGPT-QUEUE-RUNNER
+
+on:
+  push:
+    branches:
+      - backup-job-20261006-011244-WIB
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  TARGET_SHA: 8233c446a68f93c958b1475ecf726de942a377bf
+  BACKUP_DATE_WIB: 2026-10-06
+  BACKUP_TIME_WIB: 01-12-44
+  ROOT_NAME: CHATGPT-QUEUE-RUNNER-BACKUP-2026-10-06_01-12-44_WIB
+  ZIP_NAME: CHATGPT-QUEUE-RUNNER-BACKUP-2026-10-06_01-12-44_WIB.zip
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Prepare verified repository mirror
+        env:
+          GH_TOKEN_VALUE: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p work
+          git clone --mirror "https://x-access-token:${GH_TOKEN_VALUE}@github.com/${GITHUB_REPOSITORY}.git" work/repo.git
+          git --git-dir=work/repo.git fsck --full
+          test "$(git --git-dir=work/repo.git cat-file -t "$TARGET_SHA")" = "commit"
+
+      - name: Build backup structure
+        run: |
+          set -euo pipefail
+          ROOT="work/$ROOT_NAME"
+          MIRROR="work/repo.git"
+          mkdir -p "$ROOT/GIT" "$ROOT/SOURCE" "$ROOT/BUILD" "$ROOT/DOCS" "$ROOT/RECOVERY"
+
+          cat > "$ROOT/00_README_PERTAMA.txt" <<'EOF'
+          BACKUP SATU APLIKASI: CHATGPT-QUEUE-RUNNER
+
+          Backup ini dibuat khusus untuk repository:
+          https://github.com/inoriko920-dev/CHATGPT-QUEUE-RUNNER
+
+          Isi utama:
+          - GIT/: bundle riwayat Git lengkap untuk pemulihan history/ref.
+          - SOURCE/: snapshot source branch main pada commit yang dibackup.
+          - DOCS/: dokumentasi repository yang tersedia.
+          - RECOVERY/: script dan petunjuk pemulihan Windows 11.
+          - SHA256SUMS.txt: checksum file penting di dalam paket.
+
+          Jika GitHub lama tidak dapat diakses, mulai dari README_RESTORE.txt dan RECOVERY/PETUNJUK_PEMULIHAN.txt.
+          EOF
+
+          cat > "$ROOT/00_BACKUP_INFO.txt" <<EOF
+          APP_NAME=CHATGPT-QUEUE-RUNNER
+          ORIGINAL_REPO=https://github.com/inoriko920-dev/CHATGPT-QUEUE-RUNNER
+          DEFAULT_BRANCH=main
+          BACKUP_DATE_WIB=$BACKUP_DATE_WIB
+          BACKUP_TIME_WIB=${BACKUP_TIME_WIB//-/:} WIB
+          MAIN_COMMIT=$TARGET_SHA
+          SCOPE=SINGLE_REPOSITORY_ONLY
+          OTHER_REPOSITORIES_INCLUDED=NO
+          EOF
+
+          cat > "$ROOT/REPOSITORY_INFO.txt" <<EOF
+          NAME=CHATGPT-QUEUE-RUNNER
+          OWNER=inoriko920-dev
+          REPOSITORY=inoriko920-dev/CHATGPT-QUEUE-RUNNER
+          DEFAULT_BRANCH=main
+          TARGET_MAIN_COMMIT=$TARGET_SHA
+          BACKUP_TIMESTAMP_WIB=$BACKUP_DATE_WIB ${BACKUP_TIME_WIB//-/:} WIB
+          SOURCE_SNAPSHOT_COMMIT=$TARGET_SHA
+          EOF
+
+          printf '%s\n' "$TARGET_SHA" > "$ROOT/MAIN_COMMIT.txt"
+
+          git --git-dir="$MIRROR" for-each-ref --format='%(refname:short)|%(objectname)|%(objecttype)' refs/heads > "$ROOT/BRANCHES.txt"
+          git --git-dir="$MIRROR" for-each-ref --format='%(refname:short)|%(objectname)|%(objecttype)' refs/tags > "$ROOT/TAGS.txt"
+          git --git-dir="$MIRROR" log --all --date=iso-strict --pretty=format:'%H|%ad|%an|%ae|%s' > "$ROOT/COMMIT_HISTORY.txt"
+
+          BUNDLE="$ROOT/GIT/CHATGPT-QUEUE-RUNNER-COMPLETE-GIT-HISTORY.bundle"
+          git --git-dir="$MIRROR" bundle create "$BUNDLE" --all
+          git --git-dir="$MIRROR" bundle verify "$BUNDLE" > "$ROOT/GIT/BUNDLE_VERIFY.txt" 2>&1
+          git bundle list-heads "$BUNDLE" > "$ROOT/GIT/BUNDLE_REFS.txt"
+
+          SOURCE_ZIP="$ROOT/SOURCE/CHATGPT-QUEUE-RUNNER-SOURCE-MAIN-$TARGET_SHA.zip"
+          git --git-dir="$MIRROR" archive --format=zip --output="$SOURCE_ZIP" "$TARGET_SHA"
+          unzip -t "$SOURCE_ZIP" > "$ROOT/SOURCE/SOURCE_ZIP_VERIFY.txt"
+
+          if git --git-dir="$MIRROR" cat-file -e "$TARGET_SHA:docs" 2>/dev/null; then
+            git --git-dir="$MIRROR" archive "$TARGET_SHA" docs | tar -x -C "$ROOT/DOCS"
+          fi
+          if git --git-dir="$MIRROR" cat-file -e "$TARGET_SHA:README.md" 2>/dev/null; then
+            git --git-dir="$MIRROR" show "$TARGET_SHA:README.md" > "$ROOT/DOCS/README.md"
+          fi
+
+          cat > "$ROOT/BUILD/BUILD_NOT_AVAILABLE.txt" <<'EOF'
+          BUILD_NOT_AVAILABLE
+
+          Tidak ditemukan GitHub Release/build portable terpublikasi pada saat backup.
+          Repository ini terutama berisi source Chrome extension yang dapat dimuat melalui Chrome Developer Mode > Load unpacked.
+          Tidak ada build baru yang dibuat hanya untuk memenuhi backup.
+          EOF
+
+          cat > "$ROOT/REQUIRED_SECRETS.txt" <<'EOF'
+          NO_REQUIRED_SECRETS_IDENTIFIED_FROM_REPOSITORY_CONTENTS
+
+          Tidak ada password, API key, token GitHub, token Gemini, credential, atau secret lain yang sengaja dimasukkan ke paket backup.
+          Jika konfigurasi lokal di luar repository membutuhkan credential di masa depan, isi kembali secara manual dan jangan menyimpannya ke Git.
+          EOF
+
+          cat > "$ROOT/README_RESTORE.txt" <<'EOF'
+          CARA RESTORE CHATGPT-QUEUE-RUNNER
+
+          1. Ekstrak ZIP backup.
+          2. Jalankan RECOVERY\VERIFY_BACKUP.ps1 dari PowerShell Windows 11.
+          3. Pastikan checksum dan Git Bundle dinyatakan valid.
+          4. Buat repository GitHub baru yang kosong.
+          5. Jalankan RECOVERY\RESTORE_TO_NEW_GITHUB.ps1.
+          6. Masukkan URL repository GitHub baru saat diminta.
+          7. Script akan membuat clone dari Git Bundle, memasang remote baru, lalu meminta konfirmasi sebelum push.
+          8. Setelah push, periksa branch/tag dan commit utama.
+          9. Untuk penggunaan Chrome extension, buka chrome://extensions, aktifkan Developer mode, lalu Load unpacked folder runner yang diperlukan.
+          EOF
+
+          cat > "$ROOT/RECOVERY/PETUNJUK_PEMULIHAN.txt" <<EOF
+          PETUNJUK PEMULIHAN — CHATGPT-QUEUE-RUNNER
+          Backup: $BACKUP_DATE_WIB ${BACKUP_TIME_WIB//-/:} WIB
+          Commit utama: $TARGET_SHA
+
+          Kondisi awal: GitHub lama tidak bisa diakses.
+
+          A. Verifikasi
+          1. Ekstrak paket backup.
+          2. Buka PowerShell di folder backup.
+          3. Jalankan: .\RECOVERY\VERIFY_BACKUP.ps1
+          4. Jangan lanjut bila checksum atau bundle gagal.
+
+          B. Pulihkan ke GitHub baru
+          1. Buat repo kosong di akun GitHub baru.
+          2. Jalankan: .\RECOVERY\RESTORE_TO_NEW_GITHUB.ps1
+          3. Masukkan URL repo baru, misalnya https://github.com/USERNAME/CHATGPT-QUEUE-RUNNER.git
+          4. Periksa folder restore yang dibuat script.
+          5. Script tidak akan push sampai Anda mengetik persetujuan.
+          6. Setelah push, cocokkan commit main dengan: $TARGET_SHA
+
+          C. Source mudah dibuka
+          SOURCE berisi snapshot main pada commit di atas. ZIP ini untuk inspeksi/manual restore source.
+          GIT Bundle adalah sumber utama untuk memulihkan riwayat Git lengkap.
+          EOF
+
+          cat > "$ROOT/RECOVERY/VERIFY_BACKUP.ps1" <<'EOF'
+          $ErrorActionPreference = 'Stop'
+          $Root = Split-Path -Parent $PSScriptRoot
+          $ChecksumFile = Join-Path $Root 'SHA256SUMS.txt'
+          $Bundle = Join-Path $Root 'GIT\CHATGPT-QUEUE-RUNNER-COMPLETE-GIT-HISTORY.bundle'
+          if (!(Test-Path $ChecksumFile)) { throw 'SHA256SUMS.txt tidak ditemukan.' }
+          Push-Location $Root
+          try {
+            $Failed = $false
+            Get-Content $ChecksumFile | ForEach-Object {
+              if ($_ -match '^([0-9a-fA-F]{64})  (.+)$') {
+                $Expected = $Matches[1].ToLower()
+                $Path = $Matches[2]
+                if (!(Test-Path $Path)) { Write-Host "MISSING: $Path"; $Failed = $true; return }
+                $Actual = (Get-FileHash -Algorithm SHA256 $Path).Hash.ToLower()
+                if ($Actual -ne $Expected) { Write-Host "FAIL: $Path"; $Failed = $true } else { Write-Host "PASS: $Path" }
+              }
+            }
+            if ($Failed) { throw 'Verifikasi checksum gagal.' }
+            git bundle verify $Bundle
+            if ($LASTEXITCODE -ne 0) { throw 'Git Bundle gagal diverifikasi.' }
+            Write-Host 'BACKUP VERIFIED' -ForegroundColor Green
+          } finally { Pop-Location }
+          EOF
+
+          cat > "$ROOT/RECOVERY/RESTORE_TO_NEW_GITHUB.ps1" <<'EOF'
+          $ErrorActionPreference = 'Stop'
+          $Root = Split-Path -Parent $PSScriptRoot
+          & (Join-Path $PSScriptRoot 'VERIFY_BACKUP.ps1')
+          $Bundle = Join-Path $Root 'GIT\CHATGPT-QUEUE-RUNNER-COMPLETE-GIT-HISTORY.bundle'
+          $Dest = Join-Path $Root 'RESTORED_CHATGPT-QUEUE-RUNNER'
+          if (Test-Path $Dest) { throw "Folder restore sudah ada: $Dest" }
+          git clone $Bundle $Dest
+          if ($LASTEXITCODE -ne 0) { throw 'Clone dari bundle gagal.' }
+          $NewRepo = Read-Host 'Masukkan URL repo GitHub BARU'
+          if ([string]::IsNullOrWhiteSpace($NewRepo)) { throw 'URL repo baru kosong.' }
+          Push-Location $Dest
+          try {
+            git remote remove origin 2>$null
+            git remote add origin $NewRepo
+            git fsck --full
+            git branch -a
+            git tag
+            Write-Host "Target remote: $NewRepo"
+            $Confirm = Read-Host 'Ketik PUSH untuk mengirim semua branch/tag ke GitHub baru'
+            if ($Confirm -ceq 'PUSH') {
+              git push origin --all
+              if ($LASTEXITCODE -ne 0) { throw 'Push branch gagal.' }
+              git push origin --tags
+              if ($LASTEXITCODE -ne 0) { throw 'Push tag gagal.' }
+              Write-Host 'RESTORE SELESAI.' -ForegroundColor Green
+            } else {
+              Write-Host 'Push dibatalkan. Clone lokal tetap tersedia.' -ForegroundColor Yellow
+            }
+          } finally { Pop-Location }
+          EOF
+
+      - name: Secret-pattern safety scan
+        run: |
+          set -euo pipefail
+          mkdir -p work/source-check
+          git --git-dir=work/repo.git archive "$TARGET_SHA" | tar -x -C work/source-check
+          PATTERN='gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|AIza[0-9A-Za-z_-]{35}|sk-[A-Za-z0-9_-]{20,}|AKIA[0-9A-Z]{16}|-----BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY-----'
+          if grep -R -I -n -E "$PATTERN" work/source-check > work/secret_hits.txt; then
+            cat work/secret_hits.txt
+            echo 'Potential secret pattern found. Backup aborted.' >&2
+            exit 1
+          fi
+          echo 'SELECTED_SECRET_PATTERN_SCAN=PASS' > "work/$ROOT_NAME/SECRET_SCAN_STATUS.txt"
+
+      - name: Restore drill and finalize checksums
+        run: |
+          set -euo pipefail
+          ROOT="work/$ROOT_NAME"
+          BUNDLE="$ROOT/GIT/CHATGPT-QUEUE-RUNNER-COMPLETE-GIT-HISTORY.bundle"
+          SOURCE_ZIP="$ROOT/SOURCE/CHATGPT-QUEUE-RUNNER-SOURCE-MAIN-$TARGET_SHA.zip"
+
+          test -s "$BUNDLE"
+          test -s "$SOURCE_ZIP"
+          git --git-dir=work/repo.git bundle verify "$BUNDLE"
+
+          git clone "$BUNDLE" work/restore-test
+          git -C work/restore-test fsck --full
+          RESTORED_MAIN="$(git -C work/restore-test rev-parse main)"
+          test "$RESTORED_MAIN" = "$TARGET_SHA"
+
+          BRANCH_COUNT="$(wc -l < "$ROOT/BRANCHES.txt" | tr -d ' ')"
+          TAG_COUNT="$(wc -l < "$ROOT/TAGS.txt" | tr -d ' ')"
+          COMMIT_COUNT="$(git --git-dir=work/repo.git rev-list --all --count)"
+
+          cat > "$ROOT/STATUS_BACKUP.txt" <<EOF
+          BACKUP_STATUS=BACKUP_COMPLETE
+          APP_NAME=CHATGPT-QUEUE-RUNNER
+          BACKUP_DATE_WIB=$BACKUP_DATE_WIB
+          BACKUP_TIME_WIB=${BACKUP_TIME_WIB//-/:} WIB
+          MAIN_COMMIT=$TARGET_SHA
+          RESTORE_DRILL=PASS
+          GIT_BUNDLE_VERIFY=PASS
+          SOURCE_ZIP_VERIFY=PASS
+          SECRET_PATTERN_SCAN=PASS
+          BUILD_STATUS=BUILD_NOT_AVAILABLE
+          BRANCH_COUNT=$BRANCH_COUNT
+          TAG_COUNT=$TAG_COUNT
+          COMMIT_COUNT=$COMMIT_COUNT
+          EOF
+
+          cat > "$ROOT/00_MASTER_MANIFEST.txt" <<EOF
+          TOTAL_PROJECTS=1
+          APP_NAME=CHATGPT-QUEUE-RUNNER
+          ORIGINAL_REPO=https://github.com/inoriko920-dev/CHATGPT-QUEUE-RUNNER
+          BACKUP_DATE_WIB=$BACKUP_DATE_WIB
+          BACKUP_TIME_WIB=${BACKUP_TIME_WIB//-/:} WIB
+          MAIN_COMMIT=$TARGET_SHA
+          GIT_BUNDLE=GIT/CHATGPT-QUEUE-RUNNER-COMPLETE-GIT-HISTORY.bundle
+          SOURCE_SNAPSHOT=SOURCE/CHATGPT-QUEUE-RUNNER-SOURCE-MAIN-$TARGET_SHA.zip
+          BUILD=BUILD_NOT_AVAILABLE
+          DOCS=DOCS/
+          RECOVERY_SCRIPT=RECOVERY/RESTORE_TO_NEW_GITHUB.ps1
+          BACKUP_STATUS=BACKUP_COMPLETE
+          CHECKSUM_STATUS=PASS
+          RESTORE_DRILL=PASS
+          OTHER_REPOSITORIES_INCLUDED=NO
+          EOF
+
+          cat > "$ROOT/00_MASTER_MANIFEST.csv" <<EOF
+          APP_NAME,ORIGINAL_REPO,DEFAULT_BRANCH,MAIN_COMMIT,BACKUP_DATE_WIB,BACKUP_TIME_WIB,BACKUP_STATUS,BUILD_STATUS
+          CHATGPT-QUEUE-RUNNER,https://github.com/inoriko920-dev/CHATGPT-QUEUE-RUNNER,main,$TARGET_SHA,$BACKUP_DATE_WIB,${BACKUP_TIME_WIB//-/:} WIB,BACKUP_COMPLETE,BUILD_NOT_AVAILABLE
+          EOF
+
+          (cd "$ROOT" && find . -type f ! -name 'SHA256SUMS.txt' -print0 | sort -z | xargs -0 sha256sum | sed 's#  \./#  #' > SHA256SUMS.txt)
+          (cd "$ROOT" && sha256sum -c SHA256SUMS.txt)
+
+          cd work
+          zip -qr "$ZIP_NAME" "$ROOT_NAME"
+          unzip -t "$ZIP_NAME"
+          sha256sum "$ZIP_NAME" | tee MASTER_ZIP_SHA256.txt
+          test -s "$ZIP_NAME"
+
+      - name: Upload final backup ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: CHATGPT-QUEUE-RUNNER-BACKUP-2026-10-06_01-12-44_WIB
+          path: work/CHATGPT-QUEUE-RUNNER-BACKUP-2026-10-06_01-12-44_WIB.zip
+          if-no-files-found: error
+          retention-days: 30
