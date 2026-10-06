@@ -4,8 +4,8 @@
 
   const STATE_KEY = "cqr_state";
   const LAST_CONVERSATION_URL_KEY = "cqr_last_conversation_url";
-  const CHECK_INTERVAL_MS = 750;
-  const RECOVERY_DELAY_MS = 4000;
+  const CHECK_INTERVAL_MS = 600;
+  const RECOVERY_DELAY_MS = 1800;
   const RECOVERY_COOLDOWN_MS = 5000;
 
   const COMPOSER_SELECTORS = [
@@ -14,9 +14,8 @@
     "textarea[data-testid='prompt-textarea']",
     "form[data-chatgpt-composer] [data-composer-markdown][contenteditable='true'][role='textbox']",
     "form[data-chatgpt-composer] .ProseMirror[contenteditable='true']",
-    "div[contenteditable='true'][data-lexical-editor='true']",
-    "main div[contenteditable='true'][role='textbox']",
-    "[contenteditable='true'][role='textbox'][aria-label*='Chat' i]"
+    "form[data-chatgpt-composer] div[contenteditable='true'][data-lexical-editor='true']",
+    "form[data-chatgpt-composer] [contenteditable='true'][role='textbox'][aria-label*='Chat' i]"
   ];
 
   const STOP_SELECTORS = [
@@ -39,10 +38,11 @@
   ];
 
   let localTabId = null;
-  let missingComposerSince = null;
+  let recoverySince = null;
   let recoveryLocked = false;
   let lastRecoveryAttemptAt = 0;
   let lastRememberedUrl = "";
+  let activeOwnQueuedPrompt = false;
 
   function sleep(milliseconds) {
     return new Promise((resolve) => setTimeout(resolve, milliseconds));
@@ -58,6 +58,20 @@
       rect.height > 0;
   }
 
+  function isUsableComposer(element) {
+    if (!isVisible(element)) return false;
+    if (element.closest("[role='dialog'], [aria-modal='true']")) return false;
+
+    const rect = element.getBoundingClientRect();
+    const x = Math.min(window.innerWidth - 1, Math.max(0, rect.left + rect.width / 2));
+    const y = Math.min(window.innerHeight - 1, Math.max(0, rect.top + rect.height / 2));
+    const top = document.elementFromPoint(x, y);
+    if (!top) return true;
+
+    const form = element.closest("form");
+    return element === top || element.contains(top) || (form && form.contains(top));
+  }
+
   function firstVisible(selectors, root = document) {
     for (const selector of selectors) {
       const match = [...root.querySelectorAll(selector)].find(isVisible);
@@ -67,7 +81,11 @@
   }
 
   function getComposer() {
-    return firstVisible(COMPOSER_SELECTORS);
+    for (const selector of COMPOSER_SELECTORS) {
+      const match = [...document.querySelectorAll(selector)].find(isUsableComposer);
+      if (match) return match;
+    }
+    return null;
   }
 
   function isGenerating() {
@@ -95,11 +113,28 @@
     }
   }
 
+  function looksLikeConversationUrl(rawUrl) {
+    try {
+      const url = new URL(rawUrl, window.location.href);
+      return url.pathname === "/" || /\/c\/[^/]+/.test(url.pathname);
+    } catch (_error) {
+      return false;
+    }
+  }
+
   async function rememberConversationUrl() {
     const url = cleanChatUrl(window.location.href);
-    if (!url || url === lastRememberedUrl) return;
+    if (!url || !looksLikeConversationUrl(url) || url === lastRememberedUrl) return;
     lastRememberedUrl = url;
     await chrome.storage.local.set({ [LAST_CONVERSATION_URL_KEY]: url });
+  }
+
+  function getTargetConversationUrl(state, stored) {
+    const inFlightUrl = cleanChatUrl(state?.inFlight?.conversationUrl || "");
+    if (inFlightUrl && looksLikeConversationUrl(inFlightUrl)) return inFlightUrl;
+
+    const storedUrl = cleanChatUrl(stored[LAST_CONVERSATION_URL_KEY] || "");
+    return storedUrl && looksLikeConversationUrl(storedUrl) ? storedUrl : "";
   }
 
   function dispatchEscape() {
@@ -119,35 +154,46 @@
     window.dispatchEvent(new KeyboardEvent("keyup", options));
   }
 
-  function findArtifactCloseButton() {
-    const containers = [...document.querySelectorAll("[role='dialog'], [aria-modal='true']")]
-      .filter(isVisible);
-    const closePattern = /^(close|close preview|close document|back|tutup|kembali)$/i;
+  function artifactSurfaceVisible() {
+    const direct = firstVisible([
+      "[data-testid*='artifact' i]",
+      "[data-testid*='canvas' i]",
+      "[aria-label*='artifact' i]",
+      "[aria-label*='document preview' i]",
+      "[aria-label*='preview document' i]"
+    ]);
+    if (direct) return true;
 
-    for (const container of containers) {
-      const buttons = [...container.querySelectorAll("button")].filter(isVisible);
-      const match = buttons.find((button) => {
-        const text = `${button.getAttribute("aria-label") || ""} ${button.getAttribute("title") || ""} ${button.textContent || ""}`
-          .replace(/\s+/g, " ")
-          .trim();
-        return closePattern.test(text);
-      });
-      if (match) return match;
-    }
-    return null;
+    const dialogs = [...document.querySelectorAll("[role='dialog'], [aria-modal='true']")].filter(isVisible);
+    return dialogs.some((dialog) => {
+      const text = `${dialog.getAttribute("aria-label") || ""} ${dialog.getAttribute("title") || ""} ${dialog.textContent || ""}`
+        .replace(/\s+/g, " ")
+        .slice(0, 3000);
+      return /(\.docx\b|artifact|document preview|preview document|dokumen|canvas)/i.test(text);
+    });
   }
 
-  async function tryCloseArtifactView() {
-    dispatchEscape();
-    await sleep(300);
-    if (getComposer()) return true;
+  function syntheticArtifactTarget(target) {
+    if (!(target instanceof Element)) return null;
+    const control = target.closest("a, button, [role='button']");
+    if (!control) return null;
+    if (control.closest("form[data-chatgpt-composer]")) return null;
 
-    const closeButton = findArtifactCloseButton();
-    if (!closeButton) return false;
-    closeButton.click();
-    await sleep(600);
-    return Boolean(getComposer());
+    const text = `${control.getAttribute("href") || ""} ${control.getAttribute("aria-label") || ""} ${control.getAttribute("title") || ""} ${control.textContent || ""}`
+      .replace(/\s+/g, " ")
+      .trim();
+
+    return /(\.docx\b|open document|preview document|open artifact|dokumen.*buka|buka.*dokumen)/i.test(text)
+      ? control
+      : null;
   }
+
+  document.addEventListener("click", (event) => {
+    if (!activeOwnQueuedPrompt || event.isTrusted) return;
+    if (!syntheticArtifactTarget(event.target)) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+  }, true);
 
   async function tick() {
     if (recoveryLocked || localTabId === null) return;
@@ -161,57 +207,72 @@
 
     const state = stored[STATE_KEY];
     if (!state || state.ownerTabId !== localTabId) {
-      missingComposerSince = null;
-      return;
-    }
-
-    if (getComposer()) {
-      missingComposerSince = null;
-      if (state.status === "running") await rememberConversationUrl();
+      activeOwnQueuedPrompt = false;
+      recoverySince = null;
       return;
     }
 
     const ownQueuedPrompt = state.status === "running" &&
       state.inFlight &&
       state.inFlight.external !== true;
+    activeOwnQueuedPrompt = Boolean(ownQueuedPrompt);
 
-    if (!ownQueuedPrompt || isGenerating() || hasBlockingConfirmation()) {
-      missingComposerSince = null;
+    if (!ownQueuedPrompt) {
+      recoverySince = null;
+      if (state.status === "running" && getComposer()) await rememberConversationUrl();
       return;
     }
 
-    if (!missingComposerSince) {
-      missingComposerSince = Date.now();
+    const targetUrl = getTargetConversationUrl(state, stored);
+    const currentUrl = cleanChatUrl(window.location.href);
+    const routeMovedAway = Boolean(targetUrl && currentUrl && targetUrl !== currentUrl);
+    const artifactOpen = artifactSurfaceVisible();
+    const composer = getComposer();
+
+    if (!routeMovedAway && !artifactOpen && composer) {
+      recoverySince = null;
+      await rememberConversationUrl();
+      return;
+    }
+
+    if (isGenerating() || hasBlockingConfirmation()) {
+      recoverySince = null;
+      return;
+    }
+
+    if (!recoverySince) {
+      recoverySince = Date.now();
       return;
     }
 
     const now = Date.now();
-    if (now - missingComposerSince < RECOVERY_DELAY_MS) return;
+    if (now - recoverySince < RECOVERY_DELAY_MS) return;
     if (now - lastRecoveryAttemptAt < RECOVERY_COOLDOWN_MS) return;
 
     recoveryLocked = true;
     lastRecoveryAttemptAt = now;
     try {
-      if (await tryCloseArtifactView()) {
-        missingComposerSince = null;
-        await rememberConversationUrl();
+      if (artifactOpen) {
+        dispatchEscape();
+        await sleep(350);
+        if (getComposer() && !artifactSurfaceVisible()) {
+          recoverySince = null;
+          await rememberConversationUrl();
+          return;
+        }
+      }
+
+      if (routeMovedAway && targetUrl) {
+        window.location.assign(targetUrl);
         return;
       }
 
-      const targetUrl = cleanChatUrl(stored[LAST_CONVERSATION_URL_KEY]);
-      const currentUrl = cleanChatUrl(window.location.href);
-      if (!targetUrl || !currentUrl || targetUrl === currentUrl) return;
-
-      const target = new URL(targetUrl);
-      if (target.origin !== window.location.origin) return;
-
-      // A generated DOCX/artifact can move ChatGPT into a viewer route that has
-      // no composer. Return to the exact conversation URL that was active just
-      // before the queued prompt, while cqr_state keeps the in-flight progress.
-      window.location.assign(targetUrl);
+      if (!getComposer() && targetUrl && cleanChatUrl(window.location.href) === targetUrl) {
+        window.location.reload();
+      }
     } finally {
       recoveryLocked = false;
-      missingComposerSince = Date.now();
+      recoverySince = Date.now();
     }
   }
 

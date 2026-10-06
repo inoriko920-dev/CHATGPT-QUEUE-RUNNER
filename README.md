@@ -1,6 +1,6 @@
 # ChatGPT Queue Runner
 
-Versi **v0.1.9**. Paket berisi Runner 01–10.
+Versi **v0.1.10**. Paket berisi Runner 01–10.
 
 Perbaikan utama v0.1.9: antrean tidak lagi macet ketika prompt menghasilkan DOCX/artifact yang otomatis membuka viewer ChatGPT dan membuat kotak prompt menghilang.
 
@@ -19,3 +19,8 @@ Setiap Runner sekarang memuat `artifact-recovery.js`. Saat prompt yang dikirim r
 - state antrean tetap dipertahankan sehingga prompt yang sudah selesai tidak dikirim ulang.
 
 Setelah memperbarui source extension, buka `chrome://extensions` lalu klik **Reload** pada Runner 01–10 yang sedang dipakai.
+
+
+## v0.1.10 — DOCX/artifact guard
+
+Runner tidak lagi memakai selector contenteditable atau tombol Send global. Hanya composer ChatGPT asli yang boleh diisi dan hanya tombol kirim di form composer yang boleh diklik. Klik sintetis menuju DOCX diblokir selama item antrean aktif; klik pengguna tetap diizinkan. Jika ChatGPT berpindah ke viewer artifact, runner kembali ke URL percakapan yang disimpan tanpa mengklik kartu/file.

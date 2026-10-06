@@ -89,33 +89,70 @@
     return element.innerText || element.textContent || "";
   }
 
+  function isUsableComposer(element) {
+    if (!isVisible(element)) return false;
+    if (element.closest("[role='dialog'], [aria-modal='true']")) return false;
+
+    const rect = element.getBoundingClientRect();
+    const x = Math.min(window.innerWidth - 1, Math.max(0, rect.left + rect.width / 2));
+    const y = Math.min(window.innerHeight - 1, Math.max(0, rect.top + rect.height / 2));
+    const top = document.elementFromPoint(x, y);
+    if (!top) return true;
+
+    const form = element.closest("form");
+    return element === top || element.contains(top) || (form && form.contains(top));
+  }
+
   function getComposer() {
-    return firstVisible([
+    const selectors = [
       "#prompt-textarea[contenteditable='true']",
       "textarea[name='prompt-textarea']",
       "textarea[data-testid='prompt-textarea']",
       "form[data-chatgpt-composer] [data-composer-markdown][contenteditable='true'][role='textbox']",
       "form[data-chatgpt-composer] .ProseMirror[contenteditable='true']",
-      "div[contenteditable='true'][data-lexical-editor='true']",
-      "main div[contenteditable='true'][role='textbox']",
-      "[contenteditable='true'][role='textbox'][aria-label*='Chat' i]"
-    ]);
+      "form[data-chatgpt-composer] div[contenteditable='true'][data-lexical-editor='true']",
+      "form[data-chatgpt-composer] [contenteditable='true'][role='textbox'][aria-label*='Chat' i]"
+    ];
+
+    for (const selector of selectors) {
+      const match = [...document.querySelectorAll(selector)].find(isUsableComposer);
+      if (match) return match;
+    }
+    return null;
   }
 
-  function getSendButton() {
-    return firstVisible([
+  function getSendButton(composer = getComposer()) {
+    if (!composer) return null;
+
+    const form = composer.closest("form[data-chatgpt-composer]") || composer.closest("form");
+    const explicitSelectors = [
       "button[data-testid='send-button']",
-      "#composer-submit-button",
-      "form[data-chatgpt-composer] button[type='submit']",
-      "form[data-chatgpt-composer] button[aria-label='Send']",
+      "#composer-submit-button"
+    ];
+
+    for (const selector of explicitSelectors) {
+      const button = [...document.querySelectorAll(selector)].find(isVisible);
+      if (button && (!form || form.contains(button))) return button;
+    }
+
+    if (!form) return null;
+
+    const scopedSelectors = [
+      "button[type='submit']",
       "button.composer-submit-btn",
+      "button[aria-label='Send']",
+      "button[aria-label='Kirim']",
       "button[aria-label='Send prompt']",
       "button[aria-label='Kirim prompt']",
       "button[aria-label='Send message']",
-      "button[aria-label='Kirim pesan']",
-      "button[aria-label*='Send' i]",
-      "button[aria-label*='Kirim' i]"
-    ]);
+      "button[aria-label='Kirim pesan']"
+    ];
+
+    for (const selector of scopedSelectors) {
+      const button = [...form.querySelectorAll(selector)].find(isVisible);
+      if (button) return button;
+    }
+    return null;
   }
 
   function getStopButton() {
@@ -274,10 +311,10 @@
     return new Promise((resolve) => setTimeout(resolve, milliseconds));
   }
 
-  async function waitForSendButton(timeoutMs = 3500) {
+  async function waitForSendButton(composer, timeoutMs = 3500) {
     const startedAt = Date.now();
     while (Date.now() - startedAt < timeoutMs) {
-      const button = getSendButton();
+      const button = getSendButton(composer);
       if (button && !button.disabled && button.getAttribute("aria-disabled") !== "true") return button;
       await sleep(100);
     }
@@ -317,7 +354,7 @@
     const composerText = normalizeText(getElementText(composer));
     if (!composerText) throw new Error("Prompt gagal dimasukkan ke kotak ChatGPT");
 
-    const sendButton = await waitForSendButton();
+    const sendButton = await waitForSendButton(composer);
     if (!sendButton) throw new Error("Tombol kirim ChatGPT tidak aktif");
 
     sendButton.click();
@@ -332,6 +369,7 @@
       queueIndex,
       sentAt: Date.now(),
       assistantCountBefore,
+      conversationUrl: window.location.href,
       sawGenerating: isGenerating(),
       idleSince: null,
       lastResponseText: "",

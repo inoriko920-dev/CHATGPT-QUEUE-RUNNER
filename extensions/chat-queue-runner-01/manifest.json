@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Chat Queue Runner 01",
-  "version": "0.1.9",
-  "description": "Menjalankan antrean prompt di ChatGPT Web dan otomatis lanjut saat jawaban terhenti, gagal, atau viewer DOCX/artifact terbuka.",
+  "version": "0.1.10",
+  "description": "Menjalankan antrean prompt di ChatGPT Web dengan pengaman DOCX/artifact agar runner hanya berinteraksi dengan composer chat asli.",
   "permissions": ["storage", "activeTab", "tabs"],
   "host_permissions": ["https://chatgpt.com/*", "https://chat.openai.com/*", "http://127.0.0.1/*"],
   "action": {"default_title": "Chat Queue Runner 01", "default_popup": "popup.html"},
