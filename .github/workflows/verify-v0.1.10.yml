@@ -1,0 +1,19 @@
+name: Verify v0.1.10 DOCX Fix
+
+on:
+  push:
+    branches:
+      - verify-v0.1.10-docx-fix
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: JavaScript syntax
+        run: |
+          for f in extensions/chat-queue-runner-{01..10}/content.js extensions/chat-queue-runner-{01..10}/artifact-recovery.js; do
+            node --check "$f"
+          done
+      - name: Artifact/composer guard tests
+        run: node recovery-tests/verify-v0.1.10-artifact-guard.mjs
